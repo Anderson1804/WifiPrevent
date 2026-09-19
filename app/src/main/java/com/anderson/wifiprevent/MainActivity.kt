@@ -4,29 +4,25 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.net.Uri
-import android.net.wifi.WifiInfo
-import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.anderson.wifiprevent.data.network.WifiConnectionObserver
 import com.anderson.wifiprevent.domain.model.HistoryEntry
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
 import com.anderson.wifiprevent.ui.connection.ConnectionScreen
@@ -35,6 +31,8 @@ import com.anderson.wifiprevent.ui.theme.WifiPreventTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import com.anderson.wifiprevent.data.remote.BackendClient
+import com.anderson.wifiprevent.data.repository.ConnectionRepository
 
 class MainActivity : ComponentActivity() {
     private var showHistory by mutableStateOf(false)
@@ -51,10 +49,23 @@ class MainActivity : ComponentActivity() {
     private var backendMessage by mutableStateOf<String?>(null)
     private var backendError by mutableStateOf(false)
     private var submission: Job? = null
-    private val backend by lazy { BackendClient(applicationContext) }
-    private var callback: ConnectivityManager.NetworkCallback? = null
-    private val networks = linkedMapOf<Network, WifiSnapshot>()
-    private val connectivity by lazy { getSystemService(ConnectivityManager::class.java) }
+
+    private val connectionRepository by lazy {
+        ConnectionRepository(
+            backendClient = BackendClient(applicationContext)
+        )
+    }
+
+    private val wifiConnectionObserver by lazy {
+        WifiConnectionObserver(applicationContext) { newConnection, newStatus ->
+            if (connection?.ssid != newConnection?.ssid) {
+                backendMessage = null
+            }
+
+            connection = newConnection
+            status = newStatus
+        }
+    }
     private val localNetworkPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -128,7 +139,8 @@ class MainActivity : ComponentActivity() {
         historyError = null
         lifecycleScope.launch {
             try {
-                val page = backend.history(cursor)
+                val page =
+                    connectionRepository.getHistory(cursor)
                 historyEntries = if (more) (historyEntries + page.entries).distinctBy { it.id } else page.entries
                 historyCursor = page.nextBefore
                 historyHasMore = page.nextBefore != null
@@ -155,7 +167,8 @@ class MainActivity : ComponentActivity() {
         backendError = false
         submission = lifecycleScope.launch {
             try {
-                val receipt = backend.send(snapshot)
+                val receipt =
+                    connectionRepository.saveConnection(snapshot)
                 backendMessage = "Red enviada: ${snapshot.ssid ?: "Nombre no disponible"}\n$receipt"
             } catch (e: CancellationException) {
                 throw e
@@ -169,9 +182,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun stopObservation() {
-        callback?.let { connectivity.unregisterNetworkCallback(it) }
-        callback = null
-        networks.clear()
+        wifiConnectionObserver.stop()
     }
 
     private fun restartObservation() {
@@ -185,45 +196,8 @@ class MainActivity : ComponentActivity() {
             else location.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
                 location.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
         status = "Sin conexión Wi-Fi detectada. Conéctate a una red para comenzar."
-        val flags = if (Build.VERSION.SDK_INT >= 31 && permissionGranted)
-            ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO else 0
-        val observer = object : ConnectivityManager.NetworkCallback(flags) {
-            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                if (callback !== this) return
-                @Suppress("DEPRECATION")
-                val info = if (Build.VERSION.SDK_INT >= 31) caps.transportInfo as? WifiInfo
-                    else applicationContext.getSystemService(WifiManager::class.java).connectionInfo
-                val next = WifiSnapshot(
-                    ssid = info?.ssid?.takeUnless { it == WifiManager.UNKNOWN_SSID || it.isBlank() }
-                        ?.removeSurrounding("\""),
-                    rssi = info?.rssi?.takeIf { it in -126..-1 },
-                    frequency = info?.frequency?.takeIf { it > 0 },
-                    speed = info?.linkSpeed?.takeIf { it > 0 },
-                    internetValidated = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),
-                    captivePortal = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)
-                )
-                networks[network] = next
-                if (connection?.ssid != next.ssid) backendMessage = null
-                connection = next
-                status = "Conexión Wi-Fi detectada"
-            }
-            override fun onLost(network: Network) {
-                if (callback !== this) return
-                networks.remove(network)
-                connection = networks.values.lastOrNull()
-                backendMessage = null
-                if (connection == null) status = "La conexión Wi-Fi se perdió."
-            }
-        }
-        callback = observer
-        try {
-            connectivity.registerNetworkCallback(NetworkRequest.Builder()
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-                .build(), observer, Handler(Looper.getMainLooper()))
-        } catch (_: SecurityException) {
-            callback = null
-            status = "Android no permitió consultar la conexión. Revisa los permisos de la aplicación."
-        }
+        wifiConnectionObserver.start(
+            hasLocationPermission = permissionGranted
+        )
     }
 }
