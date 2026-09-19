@@ -1,4 +1,4 @@
-package com.anderson.wifiprevent
+package com.anderson.wifiprevent.ui.history
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,7 +12,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-
+import com.anderson.wifiprevent.domain.model.HistoryEntry
 @Composable
 fun HistoryScreen(entries: List<HistoryEntry>, loading: Boolean, error: String?,
                   hasMore: Boolean, onBack: () -> Unit, onRefresh: () -> Unit,
