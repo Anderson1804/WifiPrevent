@@ -6,5 +6,6 @@ data class WifiSnapshot(
     val frequency: Int?,
     val speed: Int?,
     val internetValidated: Boolean,
-    val captivePortal: Boolean
+    val captivePortal: Boolean,
+    val securityType: String?
 )
