@@ -1,9 +1,9 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Index, Integer, String, UniqueConstraint, Uuid
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Index, Integer, JSON, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
-from database import Base
+from app.db.session import Base
 
 class ConnectionCheck(Base):
     __tablename__ = "connection_checks"
@@ -22,5 +22,14 @@ class ConnectionCheck(Base):
     link_speed_mbps: Mapped[int | None] = mapped_column(Integer)
     internet_validated: Mapped[bool] = mapped_column(Boolean)
     captive_portal: Mapped[bool] = mapped_column(Boolean)
+    security_type: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+    )
     risk_level: Mapped[str | None] = mapped_column(String(32), default=None)
+    risk_reasons: Mapped[list[str] | None] = mapped_column(
+        JSON,
+        nullable=True,
+        default=None,
+    )
     analysis_performed: Mapped[bool] = mapped_column(Boolean, default=False)
