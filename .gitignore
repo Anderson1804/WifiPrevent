@@ -1,15 +1,44 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# Credenciales y configuración privada
+.env
+.env.*
+*.env
+!.env.example
+!.env.sample
+
+# Configuración local de Android
 local.properties
+.gradle/
+.kotlin/
+.idea/
+*.iml
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Archivos de firma
+*.jks
+*.keystore
+keystore.properties
+key.properties
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# PostgreSQL y configuración local del backend
+backend/.local/
+
+# Registros de ejecución
+*.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
