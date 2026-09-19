@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
+import com.anderson.wifiprevent.ui.common.formatSecurityType
 
 @Composable
 fun ConnectionScreen(
@@ -90,6 +91,11 @@ fun ConnectionScreen(
                     ConnectionDetail(
                         label = "Velocidad del enlace",
                         value = wifi.speed?.let { "$it Mbps" }
+                    )
+
+                    ConnectionDetail(
+                        label = "Seguridad",
+                        value = formatSecurityType(wifi.securityType)
                     )
 
                     ConnectionDetail(
@@ -200,9 +206,9 @@ fun ConnectionScreen(
         HorizontalDivider()
 
         Text(
-            text = "Al guardar, el nombre de la red y los datos mostrados se " +
-                    "conservan en la base de datos de tu PC. El riesgo todavía no " +
-                    "se evalúa. Esta prueba no usa AWS.",
+            text = "Al guardar, los datos mostrados y la evaluación de riesgo se " +
+                    "conservan en la base de datos local de tu PC. Esta versión " +
+                    "de desarrollo todavía no utiliza AWS.",
             style = MaterialTheme.typography.bodySmall
         )
     }
