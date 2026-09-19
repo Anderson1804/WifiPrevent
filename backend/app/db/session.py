@@ -5,13 +5,17 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-ROOT = Path(__file__).resolve().parent
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 def database_url():
     value = os.environ.get("DATABASE_URL")
     if value:
         return value
-    config = ROOT / ".local" / "app-config.json"
+    config = (
+            BACKEND_ROOT
+            / ".local"
+            / "app-config.json"
+    )
     if not config.exists():
         raise RuntimeError("Configura DATABASE_URL o ejecuta la preparación de PostgreSQL local.")
     return json.loads(config.read_text(encoding="utf-8"))["database_url"]
