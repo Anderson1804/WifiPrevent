@@ -13,6 +13,9 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import com.anderson.wifiprevent.domain.model.HistoryEntry
+import com.anderson.wifiprevent.ui.common.formatSecurityType
+import com.anderson.wifiprevent.ui.common.formatRiskLevel
+
 @Composable
 fun HistoryScreen(entries: List<HistoryEntry>, loading: Boolean, error: String?,
                   hasMore: Boolean, onBack: () -> Unit, onRefresh: () -> Unit,
@@ -24,7 +27,9 @@ fun HistoryScreen(entries: List<HistoryEntry>, loading: Boolean, error: String?,
             TextButton(onClick = onBack) { Text("Volver a la conexión") }
             Text("Historial", style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold)
-            Text("Consultas guardadas desde esta instalación. El riesgo todavía no se evalúa.")
+            Text(
+                "Consultas guardadas desde esta instalación con su evaluación de riesgo."
+            )
             OutlinedButton(onClick = onRefresh, enabled = !loading,
                 modifier = Modifier.fillMaxWidth()) { Text("Actualizar historial") }
         }
@@ -41,10 +46,26 @@ fun HistoryScreen(entries: List<HistoryEntry>, loading: Boolean, error: String?,
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(entry.ssid ?: "Nombre no disponible", style = MaterialTheme.typography.titleLarge)
                     Text(formatHistoryDate(entry.receivedAt), style = MaterialTheme.typography.labelLarge)
-                    Text("Riesgo no evaluado", fontWeight = FontWeight.Bold)
+                    Text(
+                        text = formatRiskLevel(
+                            entry.riskLevel,
+                            entry.analysisPerformed
+                        ),
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    entry.riskReasons.forEach { reason ->
+                        Text(
+                            text = "• $reason",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                     Text("Señal: ${entry.rssi?.let { "$it dBm" } ?: "No disponible"}")
                     Text("Frecuencia: ${entry.frequency?.let { "$it MHz" } ?: "No disponible"}")
                     Text("Velocidad del enlace: ${entry.speed?.let { "$it Mbps" } ?: "No disponible"}")
+                    Text(
+                        "Seguridad: ${formatSecurityType(entry.securityType)}"
+                    )
                     Text(when {
                         entry.captivePortal -> "La red requería iniciar sesión"
                         entry.internetValidated -> "Internet validado por Android al consultar"
