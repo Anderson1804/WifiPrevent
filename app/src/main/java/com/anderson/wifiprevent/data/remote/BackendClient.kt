@@ -1,7 +1,10 @@
-package com.anderson.wifiprevent
+package com.anderson.wifiprevent.data.remote
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import com.anderson.wifiprevent.domain.model.HistoryEntry
+import com.anderson.wifiprevent.domain.model.HistoryPage
+import com.anderson.wifiprevent.domain.model.WifiSnapshot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -9,24 +12,15 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
-import java.security.SecureRandom
 import java.util.UUID
-import com.anderson.wifiprevent.domain.model.WifiSnapshot
-import com.anderson.wifiprevent.domain.model.HistoryEntry
-import com.anderson.wifiprevent.domain.model.HistoryPage
+import com.anderson.wifiprevent.data.local.InstallationStore
 
 // Local emulator only; release must configure HTTPS and real user authentication.
 class BackendClient(context: Context) {
     private val debug = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
-    private val preferences = context.getSharedPreferences("backend_installation", Context.MODE_PRIVATE)
-    private val token: String = preferences.getString("token", null) ?: run {
-        val bytes = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        val generated = bytes.joinToString("") { "%02x".format(it.toInt() and 255) }
-        check(preferences.edit().putString("token", generated).commit()) {
-            "No se pudo guardar la identificación de esta instalación."
-        }
-        generated
-    }
+
+    private val installationStore =
+        InstallationStore(context)
 
     suspend fun send(snapshot: WifiSnapshot): String = withContext(Dispatchers.IO) {
         val payload = JSONObject().apply {
@@ -36,19 +30,23 @@ class BackendClient(context: Context) {
             put("link_speed_mbps", snapshot.speed ?: JSONObject.NULL)
             put("internet_validated", snapshot.internetValidated)
             put("captive_portal", snapshot.captivePortal)
+            put(
+                "security_type",
+                snapshot.securityType ?: JSONObject.NULL
+            )
         }.toString()
         // Keep the identifier across retries (including app restarts) after a lost response.
-        val pendingId = preferences.getString("pending_id", null)
-        val requestId = if (pendingId != null && preferences.getString("pending_body", null) == payload)
-            pendingId else UUID.randomUUID().toString()
-        check(preferences.edit().putString("pending_id", requestId)
-            .putString("pending_body", payload).commit()) { "No se pudo preparar el envío." }
+        val requestId =
+            installationStore.requestIdFor(payload)
         val reply = request("POST", "/api/v1/connection-checks", payload, requestId)
-        require(reply.getString("status") == "received" && !reply.getBoolean("analysis_performed") &&
-                reply.has("risk_level") && reply.isNull("risk_level")) {
+        require(
+            reply.getString("status") == "received" &&
+                    reply.has("analysis_performed") &&
+                    reply.has("risk_level")
+        ) {
             "El servidor devolvió una respuesta inesperada."
         }
-        preferences.edit().remove("pending_id").remove("pending_body").commit()
+        installationStore.clearPendingRequest()
         "${reply.getString("message")}\nRecibo: ${reply.getString("receipt_id")}"
     }
 
@@ -58,12 +56,20 @@ class BackendClient(context: Context) {
         val array = response.getJSONArray("items")
         val entries = (0 until array.length()).map { index ->
             val row = array.getJSONObject(index)
-            require(!row.getBoolean("analysis_performed") && row.has("risk_level") &&
-                    row.isNull("risk_level")) { "El historial tiene un formato de riesgo no compatible." }
-            HistoryEntry(row.getString("receipt_id"), row.getString("received_at"),
-                row.nullableString("ssid"), row.nullableInt("rssi_dbm"),
-                row.nullableInt("frequency_mhz"), row.nullableInt("link_speed_mbps"),
-                row.getBoolean("internet_validated"), row.getBoolean("captive_portal"))
+            HistoryEntry(
+                row.getString("receipt_id"),
+                row.getString("received_at"),
+                row.nullableString("ssid"),
+                row.nullableInt("rssi_dbm"),
+                row.nullableInt("frequency_mhz"),
+                row.nullableInt("link_speed_mbps"),
+                row.getBoolean("internet_validated"),
+                row.getBoolean("captive_portal"),
+                row.nullableString("security_type"),
+                row.nullableString("risk_level"),
+                row.stringList("risk_reasons"),
+                row.getBoolean("analysis_performed")
+            )
         }
         HistoryPage(entries, response.nullableString("next_before"))
     }
@@ -77,7 +83,10 @@ class BackendClient(context: Context) {
             connection.connectTimeout = 5000
             connection.readTimeout = 10000
             connection.instanceFollowRedirects = false
-            connection.setRequestProperty("Authorization", "Bearer $token")
+            connection.setRequestProperty(
+                "Authorization",
+                "Bearer ${installationStore.token}"
+            )
             requestId?.let { connection.setRequestProperty("X-Request-ID", it) }
             payload?.let {
                 connection.doOutput = true
@@ -105,3 +114,15 @@ class BackendClient(context: Context) {
 
 private fun JSONObject.nullableString(key: String): String? = if (isNull(key)) null else getString(key)
 private fun JSONObject.nullableInt(key: String): Int? = if (isNull(key)) null else getInt(key)
+
+private fun JSONObject.stringList(key: String): List<String> {
+    if (!has(key) || isNull(key)) {
+        return emptyList()
+    }
+
+    val values = getJSONArray(key)
+
+    return (0 until values.length()).map { index ->
+        values.getString(index)
+    }
+}
