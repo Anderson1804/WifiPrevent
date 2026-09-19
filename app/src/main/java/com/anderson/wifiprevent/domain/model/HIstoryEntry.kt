@@ -8,6 +8,10 @@ data class HistoryEntry(
     val frequency: Int?,
     val speed: Int?,
     val internetValidated: Boolean,
-    val captivePortal: Boolean
+    val captivePortal: Boolean,
+    val securityType: String?,
+    val riskLevel: String?,
+    val riskReasons: List<String>,
+    val analysisPerformed: Boolean
 )
 
