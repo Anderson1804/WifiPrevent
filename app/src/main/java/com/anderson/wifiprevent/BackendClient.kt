@@ -11,13 +11,9 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import java.security.SecureRandom
 import java.util.UUID
-
-data class HistoryEntry(
-    val id: String, val receivedAt: String, val ssid: String?,
-    val rssi: Int?, val frequency: Int?, val speed: Int?,
-    val internetValidated: Boolean, val captivePortal: Boolean
-)
-data class HistoryPage(val entries: List<HistoryEntry>, val nextBefore: String?)
+import com.anderson.wifiprevent.domain.model.WifiSnapshot
+import com.anderson.wifiprevent.domain.model.HistoryEntry
+import com.anderson.wifiprevent.domain.model.HistoryPage
 
 // Local emulator only; release must configure HTTPS and real user authentication.
 class BackendClient(context: Context) {
