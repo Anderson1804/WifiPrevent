@@ -16,25 +16,25 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.anderson.wifiprevent.domain.model.HistoryEntry
+import com.anderson.wifiprevent.domain.model.WifiSnapshot
+import com.anderson.wifiprevent.ui.connection.ConnectionScreen
+import com.anderson.wifiprevent.ui.history.HistoryScreen
+import com.anderson.wifiprevent.ui.theme.WifiPreventTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import com.anderson.wifiprevent.ui.theme.WifiPreventTheme
 
 class MainActivity : ComponentActivity() {
     private var showHistory by mutableStateOf(false)
@@ -76,10 +76,17 @@ class MainActivity : ComponentActivity() {
                 Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
                     BackHandler(enabled = showHistory) { showHistory = false }
                     if (showHistory) {
-                        HistoryScreen(historyEntries, historyLoading, historyError, historyHasMore,
-                            onBack = { showHistory = false }, onRefresh = { loadHistory() },
-                            onMore = { loadHistory(more = true) }, modifier = Modifier.padding(padding))
-                    } else WifiScreen(
+                        HistoryScreen(
+                            historyEntries,
+                            historyLoading,
+                            historyError,
+                            historyHasMore,
+                            onBack = { showHistory = false },
+                            onRefresh = { loadHistory() },
+                            onMore = { loadHistory(more = true) },
+                            modifier = Modifier.padding(padding)
+                        )
+                    } else ConnectionScreen(
                         connection, permissionGranted, locationEnabled, status, sending, backendMessage, backendError,
                         onPermission = { permissionRequest.launch(arrayOf(
                             Manifest.permission.ACCESS_FINE_LOCATION,
@@ -218,89 +225,5 @@ class MainActivity : ComponentActivity() {
             callback = null
             status = "Android no permitió consultar la conexión. Revisa los permisos de la aplicación."
         }
-    }
-}
-
-data class WifiSnapshot(
-    val ssid: String?, val rssi: Int?, val frequency: Int?, val speed: Int?,
-    val internetValidated: Boolean, val captivePortal: Boolean
-)
-
-@Composable
-private fun WifiScreen(
-    wifi: WifiSnapshot?, permission: Boolean, location: Boolean, status: String, sending: Boolean, backendMessage: String?, backendError: Boolean,
-    onPermission: () -> Unit, onSettings: () -> Unit, onLocation: () -> Unit,
-    onWifi: () -> Unit, onCheck: () -> Unit, onHistory: () -> Unit, modifier: Modifier = Modifier
-) {
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("WiFiPrevent", style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold)
-        Text("Conoce tu conexión", style = MaterialTheme.typography.titleLarge)
-        Text("Consulta tu conexión y guarda sus datos para revisarlos después.")
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(status, style = MaterialTheme.typography.labelLarge)
-                Text(wifi?.ssid ?: if (wifi == null) "Conéctate a una red Wi-Fi" else "Nombre no disponible",
-                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                if (wifi != null) {
-                    Detail("Señal", wifi.rssi?.let { "$it dBm" })
-                    Detail("Frecuencia", wifi.frequency?.let { "$it MHz" })
-                    Detail("Velocidad del enlace", wifi.speed?.let { "$it Mbps" })
-                    Detail("Acceso a Internet", when {
-                        wifi.captivePortal -> "La red requiere iniciar sesión"
-                        wifi.internetValidated -> "Validado por Android"
-                        else -> "No validado por Android"
-                    })
-                    Text("La velocidad del enlace no es la velocidad de Internet.",
-                        style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        }
-        if (!permission) {
-            Text("Para mostrar el nombre de la red, Android requiere permiso de ubicación precisa. " +
-                "Esta versión no consulta coordenadas ni las guarda.")
-            Button(onClick = onPermission, modifier = Modifier.fillMaxWidth()) {
-                Text("Permitir lectura de la red")
-            }
-            TextButton(onClick = onSettings) { Text("Abrir permisos de la aplicación") }
-        }
-        if (!location) {
-            Text("Activa Ubicación en el teléfono si el nombre de la red no aparece.")
-            OutlinedButton(onClick = onLocation) { Text("Abrir ajustes de ubicación") }
-        }
-        if (wifi != null && wifi.ssid == null && permission && location) {
-            Text("Android no proporcionó el nombre de la red. Los datos disponibles se muestran arriba.")
-        }
-        Button(onClick = onCheck, enabled = wifi != null && !sending, modifier = Modifier.fillMaxWidth()) {
-            Text(if (sending) "Enviando…" else "Guardar consulta")
-        }
-        OutlinedButton(onClick = onWifi, modifier = Modifier.fillMaxWidth()) {
-            Text("Abrir ajustes de Wi-Fi")
-        }
-        OutlinedButton(onClick = onHistory, modifier = Modifier.fillMaxWidth()) {
-            Text("Ver historial")
-        }
-        if (sending) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            Text("Esperando la confirmación del servidor…")
-        }
-        backendMessage?.let { message ->
-            Text(if (backendError) "Envío pendiente" else "Confirmación del servidor",
-                style = MaterialTheme.typography.titleMedium,
-                color = if (backendError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-            Text(message)
-        }
-        HorizontalDivider()
-        Text("Al guardar, el nombre de la red y los datos mostrados se conservan en la base de datos de tu PC. El riesgo todavía no se evalúa. Esta prueba no usa AWS.",
-            style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-@Composable
-private fun Detail(label: String, value: String?) {
-    Column {
-        Text(label, style = MaterialTheme.typography.labelMedium)
-        Text(value ?: "No disponible", style = MaterialTheme.typography.bodyLarge)
     }
 }
