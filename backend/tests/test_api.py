@@ -1,21 +1,30 @@
 from uuid import uuid4
 import secrets
 import pytest
+
+
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
-from database import engine, get_session
+from app.db.session import engine, get_session
 from main import app
+from pathlib import Path
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 VALID = {"ssid": "AndroidWifi", "rssi_dbm": -50, "frequency_mhz": 2447,
-         "link_speed_mbps": 1, "internet_validated": True, "captive_portal": False}
+         "link_speed_mbps": 1, "internet_validated": True, "captive_portal": False, "security_type": "WPA3_SAE"}
 
 @pytest.fixture(scope="session", autouse=True)
 def migrate():
     assert engine.url.database == "wifiprevent_test"
-    command.upgrade(Config("alembic.ini"), "head")
+    assert engine.url.database == "wifiprevent_test"
+    command.upgrade(
+        Config(str(BACKEND_ROOT / "alembic.ini")),
+        "head"
+    )
 
 @pytest.fixture()
 def client():
@@ -37,14 +46,18 @@ def test_saved_then_read_in_new_connection(client, headers):
     response = client.post("/api/v1/connection-checks", json=VALID, headers=headers)
     assert response.status_code == 200
     body = response.json()
-    assert body["risk_level"] is None and body["analysis_performed"] is False
+    assert body["risk_level"] == "low"
+    assert body["analysis_performed"] is True
+    assert body["risk_reasons"]
     assert "ssid" not in body
     engine.dispose()
     page = client.get("/api/v1/connection-checks", headers=headers).json()
     assert page["items"][0]["receipt_id"] == body["receipt_id"]
     assert page["items"][0]["ssid"] == "AndroidWifi"
     assert page["items"][0]["received_at"].endswith("Z")
-    assert page["items"][0]["risk_level"] is None
+    assert page["items"][0]["risk_level"] == "low"
+    assert page["items"][0]["analysis_performed"] is True
+    assert page["items"][0]["risk_reasons"]
 
 def test_null_metadata_persists(client, headers):
     assert client.post("/api/v1/connection-checks", json={
