@@ -27,6 +27,7 @@ import com.anderson.wifiprevent.domain.model.HistoryEntry
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
 import com.anderson.wifiprevent.ui.connection.ConnectionScreen
 import com.anderson.wifiprevent.ui.history.HistoryScreen
+import com.anderson.wifiprevent.ui.common.formatRiskLevel
 import com.anderson.wifiprevent.ui.theme.WifiPreventTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -169,7 +170,21 @@ class MainActivity : ComponentActivity() {
             try {
                 val receipt =
                     connectionRepository.saveConnection(snapshot)
-                backendMessage = "Red enviada: ${snapshot.ssid ?: "Nombre no disponible"}\n$receipt"
+                val risk = formatRiskLevel(
+                    receipt.riskLevel,
+                    receipt.analysisPerformed
+                )
+                val reasons = receipt.riskReasons.joinToString(separator = "\n") {
+                    "• $it"
+                }
+                backendMessage = buildString {
+                    append("Red guardada: ${snapshot.ssid ?: "Nombre no disponible"}\n")
+                    append("$risk\n")
+                    if (reasons.isNotBlank()) {
+                        append("$reasons\n")
+                    }
+                    append("Recibo: ${receipt.id}")
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
