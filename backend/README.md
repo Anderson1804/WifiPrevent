@@ -8,17 +8,35 @@ Desde la terminal de Android Studio, en la raíz del proyecto:
 .\backend\.venv\Scripts\python.exe .\backend\local_services.py
 ```
 
-Los procesos se ejecutan sin ventanas adicionales. PostgreSQL escucha solo en
-127.0.0.1:55432; FastAPI solo en 127.0.0.1:8001. El emulador accede por 10.0.2.2:8001.
-Esta versión usa el puerto 8001; el prototipo anterior usaba 8000.
-No se crean servicios de Windows ni reglas de firewall.
+El comando acepta `start`, `stop`, `restart` y `status`. Por ejemplo:
+
+```powershell
+.\backend\.venv\Scripts\python.exe .\backend\local_services.py restart
+.\backend\.venv\Scripts\python.exe .\backend\local_services.py stop
+```
+
+Los procesos se ejecutan sin ventanas adicionales. PostgreSQL continúa limitado a
+127.0.0.1:55432. FastAPI escucha en el puerto 8001 de la PC para permitir pruebas
+desde el emulador y desde un teléfono conectado a la misma red privada. El emulador
+usa 10.0.2.2 y el teléfono usa la dirección configurada como `LOCAL_BACKEND_HOST`
+en `app/build.gradle.kts`. Esta conexión HTTP solo está habilitada en compilaciones debug.
+
+Para habilitar el acceso del teléfono, abrir PowerShell como administrador y ejecutar:
+
+```powershell
+.\backend\configure_phone_access.ps1 Add
+```
+
+La regla se limita al ejecutable Python de este proyecto, al puerto TCP 8001 y al
+perfil de red privada. Puede comprobarse con `Status` y retirarse con `Remove`.
 
 ## Probar en Android
 
 Ejecutar con Run. Pulsar Guardar consulta, esperar confirmación y abrir Ver historial.
-Cada registro muestra fecha local, red, señal, frecuencia, velocidad de enlace y
-conectividad. Todos muestran Riesgo no evaluado. Cerrar y volver a abrir conserva
-el historial. Los recibos de la versión anterior no se guardaban y no se recuperan.
+Cada registro muestra fecha local, red, señal, frecuencia, velocidad, seguridad,
+conectividad y evaluación de riesgo. Las consultas nuevas guardan el nivel y sus
+razones; los registros anteriores a esta función permanecen como no evaluados.
+Cerrar y volver a abrir conserva el historial.
 
 Las consultas se separan por una clave aleatoria de instalación, guardada en las
 preferencias privadas de Android y excluida de copias de seguridad. Al borrar los
@@ -52,9 +70,10 @@ GET /api/v1/connection-checks?limit=20 devuelve la página más reciente.
 Ambas operaciones requieren Authorization: Bearer seguido de 64 caracteres hexadecimales.
 POST requiere también X-Request-ID: UUID. Repetir la misma solicitud devuelve el
 mismo recibo; reutilizar el identificador con otros datos devuelve 409.
-No se registran cuerpos ni claves en los logs HTTP.
-El estado recibido sigue siendo `received` por compatibilidad, pero ahora confirma
-persistencia. risk_level=null y analysis_performed=false.
+No se registran cuerpos ni claves en los logs HTTP. El estado `received` confirma
+la persistencia. Las consultas nuevas incluyen `risk_level`, `risk_reasons` y
+`analysis_performed=true`. La clasificación actual usa reglas explícitas sobre el
+tipo de seguridad informado por Android; todavía no utiliza aprendizaje automático.
 
 ## Pruebas
 
