@@ -2,6 +2,10 @@ package com.anderson.wifiprevent.data.remote
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import android.os.Build
+import com.anderson.wifiprevent.BuildConfig
+import com.anderson.wifiprevent.data.local.InstallationStore
+import com.anderson.wifiprevent.domain.model.ConnectionReceipt
 import com.anderson.wifiprevent.domain.model.HistoryEntry
 import com.anderson.wifiprevent.domain.model.HistoryPage
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
@@ -13,16 +17,21 @@ import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
 import java.util.UUID
-import com.anderson.wifiprevent.data.local.InstallationStore
 
-// Local emulator only; release must configure HTTPS and real user authentication.
+// Desarrollo local; una versión publicada debe usar HTTPS y autenticación real.
 class BackendClient(context: Context) {
     private val debug = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
 
     private val installationStore =
         InstallationStore(context)
 
-    suspend fun send(snapshot: WifiSnapshot): String = withContext(Dispatchers.IO) {
+    private val backendBaseUrl = if (isRunningOnEmulator()) {
+        "http://10.0.2.2:8001"
+    } else {
+        "http://${BuildConfig.LOCAL_BACKEND_HOST}:8001"
+    }
+
+    suspend fun send(snapshot: WifiSnapshot): ConnectionReceipt = withContext(Dispatchers.IO) {
         val payload = JSONObject().apply {
             put("ssid", snapshot.ssid ?: JSONObject.NULL)
             put("rssi_dbm", snapshot.rssi ?: JSONObject.NULL)
@@ -47,7 +56,13 @@ class BackendClient(context: Context) {
             "El servidor devolvió una respuesta inesperada."
         }
         installationStore.clearPendingRequest()
-        "${reply.getString("message")}\nRecibo: ${reply.getString("receipt_id")}"
+        ConnectionReceipt(
+            id = reply.getString("receipt_id"),
+            message = reply.getString("message"),
+            riskLevel = reply.nullableString("risk_level"),
+            riskReasons = reply.stringList("risk_reasons"),
+            analysisPerformed = reply.getBoolean("analysis_performed")
+        )
     }
 
     suspend fun history(before: String? = null): HistoryPage = withContext(Dispatchers.IO) {
@@ -77,7 +92,7 @@ class BackendClient(context: Context) {
     private fun request(method: String, path: String, payload: String? = null,
                         requestId: String? = null): JSONObject {
         check(debug) { "El servidor de producción todavía no está configurado." }
-        val connection = URL("http://10.0.2.2:8001$path").openConnection() as HttpURLConnection
+        val connection = URL("$backendBaseUrl$path").openConnection() as HttpURLConnection
         try {
             connection.requestMethod = method
             connection.connectTimeout = 5000
@@ -105,10 +120,21 @@ class BackendClient(context: Context) {
         } catch (_: SocketTimeoutException) {
             throw IOException("El servidor tardó demasiado. Puedes reintentar el mismo envío sin duplicarlo.")
         } catch (e: IOException) {
-            throw IOException("No se pudo conectar al servidor local. Inicia el backend en la PC y usa el emulador.", e)
+            throw IOException(
+                "No se pudo conectar al servidor local. Comprueba que el backend esté " +
+                        "iniciado y que el teléfono y la PC usen la misma red.",
+                e
+            )
         } finally {
             connection.disconnect()
         }
+    }
+
+    private fun isRunningOnEmulator(): Boolean {
+        return Build.FINGERPRINT.startsWith("generic") ||
+                Build.FINGERPRINT.contains("emulator") ||
+                Build.MODEL.contains("Emulator") ||
+                Build.MODEL.contains("Android SDK built for")
     }
 }
 
