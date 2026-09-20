@@ -4,9 +4,13 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.net.VpnService
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -23,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.anderson.wifiprevent.data.network.WifiConnectionObserver
+import com.anderson.wifiprevent.data.vpn.TrafficAnalysisService
 import com.anderson.wifiprevent.domain.model.AnalysisSession
 import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.HistoryEntry
@@ -41,6 +46,18 @@ import com.anderson.wifiprevent.data.repository.ConnectionRepository
 class MainActivity : ComponentActivity() {
     private var currentScreen by mutableStateOf(AppScreen.CONNECTION)
     private var analysisSession by mutableStateOf<AnalysisSession?>(null)
+    private var analysisElapsedSeconds by mutableStateOf(0L)
+    private var analysisStartedAtElapsedMs: Long? = null
+    private val analysisTimer = Handler(Looper.getMainLooper())
+    private val analysisTick = object : Runnable {
+        override fun run() {
+            analysisStartedAtElapsedMs?.let { startedAt ->
+                analysisElapsedSeconds =
+                    (SystemClock.elapsedRealtime() - startedAt) / 1_000
+                analysisTimer.postDelayed(this, 1_000)
+            }
+        }
+    }
     private var historyEntries by mutableStateOf<List<HistoryEntry>>(emptyList())
     private var historyLoading by mutableStateOf(false)
     private var historyError by mutableStateOf<String?>(null)
@@ -84,6 +101,28 @@ class MainActivity : ComponentActivity() {
     private val permissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { restartObservation() }
+    private val vpnPermissionRequest = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            startAnalysisService()
+        } else {
+            analysisSession = analysisSession?.copy(
+                state = AnalysisSessionState.FAILED
+            )
+        }
+    }
+    private val notificationPermissionRequest = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            requestVpnPermission()
+        } else {
+            analysisSession = analysisSession?.copy(
+                state = AnalysisSessionState.FAILED
+            )
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -109,8 +148,11 @@ class MainActivity : ComponentActivity() {
                         AppScreen.ANALYSIS -> AnalysisScreen(
                             wifi = connection,
                             session = analysisSession,
+                            elapsedSeconds = analysisElapsedSeconds,
                             onBack = { currentScreen = AppScreen.CONNECTION },
                             onPrepare = { prepareAnalysisSession() },
+                            onStart = { beginAnalysisAuthorization() },
+                            onStop = { stopAnalysisService() },
                             modifier = Modifier.padding(padding)
                         )
 
@@ -221,10 +263,78 @@ class MainActivity : ComponentActivity() {
         wifiConnectionObserver.stop()
     }
 
+    override fun onDestroy() {
+        analysisTimer.removeCallbacks(analysisTick)
+        super.onDestroy()
+    }
+
     private fun prepareAnalysisSession() {
+        analysisTimer.removeCallbacks(analysisTick)
+        analysisStartedAtElapsedMs = null
+        analysisElapsedSeconds = 0
         analysisSession = AnalysisSession(
             state = AnalysisSessionState.READY,
             ssid = connection?.ssid
+        )
+    }
+
+    private fun beginAnalysisAuthorization() {
+        analysisSession = analysisSession?.copy(
+            state = AnalysisSessionState.PREPARING
+        )
+
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionRequest.launch(
+                Manifest.permission.POST_NOTIFICATIONS
+            )
+        } else {
+            requestVpnPermission()
+        }
+    }
+
+    private fun requestVpnPermission() {
+        val preparationIntent = VpnService.prepare(this)
+        if (preparationIntent == null) {
+            startAnalysisService()
+        } else {
+            vpnPermissionRequest.launch(preparationIntent)
+        }
+    }
+
+    private fun startAnalysisService() {
+        val intent = Intent(this, TrafficAnalysisService::class.java).apply {
+            action = TrafficAnalysisService.ACTION_START
+            putExtra(
+                TrafficAnalysisService.EXTRA_NETWORK_NAME,
+                connection?.ssid
+            )
+        }
+        ContextCompat.startForegroundService(this, intent)
+
+        analysisStartedAtElapsedMs = SystemClock.elapsedRealtime()
+        analysisElapsedSeconds = 0
+        analysisSession = analysisSession?.copy(
+            state = AnalysisSessionState.ANALYZING
+        )
+        analysisTimer.removeCallbacks(analysisTick)
+        analysisTimer.post(analysisTick)
+    }
+
+    private fun stopAnalysisService() {
+        val intent = Intent(this, TrafficAnalysisService::class.java).apply {
+            action = TrafficAnalysisService.ACTION_STOP
+        }
+        startService(intent)
+        analysisTimer.removeCallbacks(analysisTick)
+        analysisStartedAtElapsedMs = null
+        analysisSession = analysisSession?.copy(
+            state = AnalysisSessionState.COMPLETED
         )
     }
 
