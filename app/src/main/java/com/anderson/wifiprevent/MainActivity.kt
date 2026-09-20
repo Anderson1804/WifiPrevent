@@ -10,7 +10,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -27,10 +26,12 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.anderson.wifiprevent.data.network.WifiConnectionObserver
+import com.anderson.wifiprevent.data.local.AnalysisSessionStore
 import com.anderson.wifiprevent.data.vpn.TrafficAnalysisService
 import com.anderson.wifiprevent.domain.model.AnalysisSession
 import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.HistoryEntry
+import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
 import com.anderson.wifiprevent.ui.connection.ConnectionScreen
 import com.anderson.wifiprevent.ui.analysis.AnalysisScreen
@@ -46,14 +47,16 @@ import com.anderson.wifiprevent.data.repository.ConnectionRepository
 class MainActivity : ComponentActivity() {
     private var currentScreen by mutableStateOf(AppScreen.CONNECTION)
     private var analysisSession by mutableStateOf<AnalysisSession?>(null)
-    private var analysisElapsedSeconds by mutableStateOf(0L)
-    private var analysisStartedAtElapsedMs: Long? = null
+    private var analysisMetrics by mutableStateOf(TrafficMetrics.EMPTY)
     private val analysisTimer = Handler(Looper.getMainLooper())
     private val analysisTick = object : Runnable {
         override fun run() {
-            analysisStartedAtElapsedMs?.let { startedAt ->
-                analysisElapsedSeconds =
-                    (SystemClock.elapsedRealtime() - startedAt) / 1_000
+            val snapshot = analysisSessionStore.snapshot()
+            if (snapshot != null && analysisSession?.id == snapshot.id) {
+                analysisMetrics = snapshot.metrics
+                analysisSession = analysisSession?.copy(state = snapshot.state)
+            }
+            if (snapshot?.state == AnalysisSessionState.ANALYZING) {
                 analysisTimer.postDelayed(this, 1_000)
             }
         }
@@ -80,7 +83,11 @@ class MainActivity : ComponentActivity() {
 
     private val wifiConnectionObserver by lazy {
         WifiConnectionObserver(applicationContext) { newConnection, newStatus ->
-            if (connection?.ssid != newConnection?.ssid) {
+            if (
+                connection != null &&
+                connection?.ssid != newConnection?.ssid &&
+                analysisSession?.state != AnalysisSessionState.ANALYZING
+            ) {
                 backendMessage = null
                 analysisSession = null
             }
@@ -112,6 +119,9 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
+    private val analysisSessionStore by lazy {
+        AnalysisSessionStore(applicationContext)
+    }
     private val notificationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -126,6 +136,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        restoreAnalysisSession()
         enableEdgeToEdge()
         setContent {
             WifiPreventTheme {
@@ -148,7 +159,7 @@ class MainActivity : ComponentActivity() {
                         AppScreen.ANALYSIS -> AnalysisScreen(
                             wifi = connection,
                             session = analysisSession,
-                            elapsedSeconds = analysisElapsedSeconds,
+                            metrics = analysisMetrics,
                             onBack = { currentScreen = AppScreen.CONNECTION },
                             onPrepare = { prepareAnalysisSession() },
                             onStart = { beginAnalysisAuthorization() },
@@ -183,6 +194,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         restartObservation()
+        refreshAnalysisSession()
     }
 
     override fun onPause() {
@@ -270,8 +282,8 @@ class MainActivity : ComponentActivity() {
 
     private fun prepareAnalysisSession() {
         analysisTimer.removeCallbacks(analysisTick)
-        analysisStartedAtElapsedMs = null
-        analysisElapsedSeconds = 0
+        analysisSessionStore.clear()
+        analysisMetrics = TrafficMetrics.EMPTY
         analysisSession = AnalysisSession(
             state = AnalysisSessionState.READY,
             ssid = connection?.ssid
@@ -314,16 +326,19 @@ class MainActivity : ComponentActivity() {
                 TrafficAnalysisService.EXTRA_NETWORK_NAME,
                 connection?.ssid
             )
+            putExtra(
+                TrafficAnalysisService.EXTRA_SESSION_ID,
+                analysisSession?.id
+            )
         }
         ContextCompat.startForegroundService(this, intent)
 
-        analysisStartedAtElapsedMs = SystemClock.elapsedRealtime()
-        analysisElapsedSeconds = 0
+        analysisMetrics = TrafficMetrics.EMPTY
         analysisSession = analysisSession?.copy(
             state = AnalysisSessionState.ANALYZING
         )
         analysisTimer.removeCallbacks(analysisTick)
-        analysisTimer.post(analysisTick)
+        analysisTimer.postDelayed(analysisTick, 250)
     }
 
     private fun stopAnalysisService() {
@@ -331,11 +346,34 @@ class MainActivity : ComponentActivity() {
             action = TrafficAnalysisService.ACTION_STOP
         }
         startService(intent)
-        analysisTimer.removeCallbacks(analysisTick)
-        analysisStartedAtElapsedMs = null
-        analysisSession = analysisSession?.copy(
-            state = AnalysisSessionState.COMPLETED
+        analysisTimer.postDelayed(analysisTick, 250)
+    }
+
+    private fun restoreAnalysisSession() {
+        val snapshot = analysisSessionStore.snapshot() ?: return
+        analysisSession = AnalysisSession(
+            id = snapshot.id,
+            state = snapshot.state,
+            ssid = snapshot.ssid
         )
+        analysisMetrics = snapshot.metrics
+        if (snapshot.state == AnalysisSessionState.ANALYZING) {
+            analysisTimer.post(analysisTick)
+        }
+    }
+
+    private fun refreshAnalysisSession() {
+        val snapshot = analysisSessionStore.snapshot() ?: return
+        if (analysisSession?.id != snapshot.id) {
+            restoreAnalysisSession()
+        } else {
+            analysisMetrics = snapshot.metrics
+            analysisSession = analysisSession?.copy(state = snapshot.state)
+            if (snapshot.state == AnalysisSessionState.ANALYZING) {
+                analysisTimer.removeCallbacks(analysisTick)
+                analysisTimer.post(analysisTick)
+            }
+        }
     }
 
     private fun restartObservation() {
