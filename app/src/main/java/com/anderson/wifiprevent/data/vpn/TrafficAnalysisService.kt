@@ -9,8 +9,10 @@ import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
 import com.anderson.wifiprevent.MainActivity
+import com.anderson.wifiprevent.data.local.AnalysisSessionStore
 
 class TrafficAnalysisService : VpnService() {
+    private val sessionStore by lazy { AnalysisSessionStore(this) }
 
     override fun onCreate() {
         super.onCreate()
@@ -24,6 +26,7 @@ class TrafficAnalysisService : VpnService() {
     ): Int {
         return when (intent?.action) {
             ACTION_STOP -> {
+                sessionStore.complete()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 START_NOT_STICKY
@@ -31,6 +34,9 @@ class TrafficAnalysisService : VpnService() {
 
             else -> {
                 val networkName = intent?.getStringExtra(EXTRA_NETWORK_NAME)
+                val sessionId = intent?.getStringExtra(EXTRA_SESSION_ID)
+                    ?: return START_NOT_STICKY
+                sessionStore.start(sessionId, networkName)
                 startAsForeground(networkName)
                 START_NOT_STICKY
             }
@@ -38,6 +44,7 @@ class TrafficAnalysisService : VpnService() {
     }
 
     override fun onRevoke() {
+        sessionStore.complete()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         super.onRevoke()
@@ -114,6 +121,7 @@ class TrafficAnalysisService : VpnService() {
         const val ACTION_STOP =
             "com.anderson.wifiprevent.action.STOP_TRAFFIC_ANALYSIS"
         const val EXTRA_NETWORK_NAME = "network_name"
+        const val EXTRA_SESSION_ID = "session_id"
 
         private const val CHANNEL_ID = "traffic_analysis"
         private const val NOTIFICATION_ID = 2001
