@@ -36,6 +36,7 @@ fun ConnectionScreen(
     onLocation: () -> Unit,
     onWifi: () -> Unit,
     onCheck: () -> Unit,
+    onAnalysis: () -> Unit,
     onHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -164,6 +165,14 @@ fun ConnectionScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(if (sending) "Enviando…" else "Guardar consulta")
+        }
+
+        OutlinedButton(
+            onClick = onAnalysis,
+            enabled = wifi != null,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Analizar tráfico")
         }
 
         OutlinedButton(
