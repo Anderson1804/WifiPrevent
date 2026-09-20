@@ -26,8 +26,11 @@ import com.anderson.wifiprevent.ui.common.formatSecurityType
 fun AnalysisScreen(
     wifi: WifiSnapshot?,
     session: AnalysisSession?,
+    elapsedSeconds: Long,
     onBack: () -> Unit,
     onPrepare: () -> Unit,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -102,21 +105,62 @@ fun AnalysisScreen(
                         text = "Sesión: ${session.id}",
                         style = MaterialTheme.typography.bodySmall
                     )
-                    Text(
-                        "La autorización VPN y la recolección de métricas se " +
-                                "incorporarán en el siguiente paso."
-                    )
+                    when (session.state) {
+                        AnalysisSessionState.READY -> Text(
+                            "La sesión está lista para solicitar la autorización VPN de Android."
+                        )
+                        AnalysisSessionState.PREPARING -> Text(
+                            "Esperando la autorización VPN del sistema."
+                        )
+                        AnalysisSessionState.ANALYZING -> {
+                            Text("Duración: ${formatDuration(elapsedSeconds)}")
+                            Text(
+                                "El servicio está activo, pero esta etapa todavía no " +
+                                        "redirige ni contabiliza paquetes."
+                            )
+                        }
+                        AnalysisSessionState.COMPLETED -> {
+                            Text("Duración final: ${formatDuration(elapsedSeconds)}")
+                            Text("La sesión terminó sin capturar contenido de tráfico.")
+                        }
+                        AnalysisSessionState.FAILED -> Text(
+                            "Android no autorizó la sesión. Puedes preparar una nueva."
+                        )
+                    }
                 }
+            }
+
+            when (session.state) {
+                AnalysisSessionState.READY -> Button(
+                    onClick = onStart,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Autorizar e iniciar")
+                }
+                AnalysisSessionState.ANALYZING -> Button(
+                    onClick = onStop,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Detener sesión")
+                }
+                else -> Unit
             }
 
             OutlinedButton(
                 onClick = onPrepare,
+                enabled = session.state != AnalysisSessionState.ANALYZING,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Preparar una sesión nueva")
             }
         }
     }
+}
+
+private fun formatDuration(totalSeconds: Long): String {
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%02d:%02d".format(minutes, seconds)
 }
 
 private fun formatState(state: AnalysisSessionState): String = when (state) {
