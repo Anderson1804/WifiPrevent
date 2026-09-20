@@ -23,9 +23,12 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.anderson.wifiprevent.data.network.WifiConnectionObserver
+import com.anderson.wifiprevent.domain.model.AnalysisSession
+import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.HistoryEntry
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
 import com.anderson.wifiprevent.ui.connection.ConnectionScreen
+import com.anderson.wifiprevent.ui.analysis.AnalysisScreen
 import com.anderson.wifiprevent.ui.history.HistoryScreen
 import com.anderson.wifiprevent.ui.common.formatRiskLevel
 import com.anderson.wifiprevent.ui.theme.WifiPreventTheme
@@ -36,7 +39,8 @@ import com.anderson.wifiprevent.data.remote.BackendClient
 import com.anderson.wifiprevent.data.repository.ConnectionRepository
 
 class MainActivity : ComponentActivity() {
-    private var showHistory by mutableStateOf(false)
+    private var currentScreen by mutableStateOf(AppScreen.CONNECTION)
+    private var analysisSession by mutableStateOf<AnalysisSession?>(null)
     private var historyEntries by mutableStateOf<List<HistoryEntry>>(emptyList())
     private var historyLoading by mutableStateOf(false)
     private var historyError by mutableStateOf<String?>(null)
@@ -61,6 +65,7 @@ class MainActivity : ComponentActivity() {
         WifiConnectionObserver(applicationContext) { newConnection, newStatus ->
             if (connection?.ssid != newConnection?.ssid) {
                 backendMessage = null
+                analysisSession = null
             }
 
             connection = newConnection
@@ -70,7 +75,7 @@ class MainActivity : ComponentActivity() {
     private val localNetworkPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (showHistory) historyError = if (granted) "Permiso concedido. Pulsa Actualizar historial."
+        if (currentScreen == AppScreen.HISTORY) historyError = if (granted) "Permiso concedido. Pulsa Actualizar historial."
             else "Permiso de red local requerido. Habilítalo desde los permisos de la aplicación."
         backendError = !granted
         backendMessage = if (granted) "Permiso concedido. Pulsa Guardar consulta."
@@ -86,19 +91,30 @@ class MainActivity : ComponentActivity() {
         setContent {
             WifiPreventTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
-                    BackHandler(enabled = showHistory) { showHistory = false }
-                    if (showHistory) {
-                        HistoryScreen(
+                    BackHandler(enabled = currentScreen != AppScreen.CONNECTION) {
+                        currentScreen = AppScreen.CONNECTION
+                    }
+                    when (currentScreen) {
+                        AppScreen.HISTORY -> HistoryScreen(
                             historyEntries,
                             historyLoading,
                             historyError,
                             historyHasMore,
-                            onBack = { showHistory = false },
+                            onBack = { currentScreen = AppScreen.CONNECTION },
                             onRefresh = { loadHistory() },
                             onMore = { loadHistory(more = true) },
                             modifier = Modifier.padding(padding)
                         )
-                    } else ConnectionScreen(
+
+                        AppScreen.ANALYSIS -> AnalysisScreen(
+                            wifi = connection,
+                            session = analysisSession,
+                            onBack = { currentScreen = AppScreen.CONNECTION },
+                            onPrepare = { prepareAnalysisSession() },
+                            modifier = Modifier.padding(padding)
+                        )
+
+                        AppScreen.CONNECTION -> ConnectionScreen(
                         connection, permissionGranted, locationEnabled, status, sending, backendMessage, backendError,
                         onPermission = { permissionRequest.launch(arrayOf(
                             Manifest.permission.ACCESS_FINE_LOCATION,
@@ -109,9 +125,14 @@ class MainActivity : ComponentActivity() {
                         onLocation = { startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) },
                         onWifi = { startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) },
                         onCheck = { sendConnection() },
-                        onHistory = { showHistory = true; loadHistory() },
+                        onAnalysis = { currentScreen = AppScreen.ANALYSIS },
+                        onHistory = {
+                            currentScreen = AppScreen.HISTORY
+                            loadHistory()
+                        },
                         modifier = Modifier.padding(padding)
                     )
+                    }
                 }
             }
         }
@@ -200,6 +221,13 @@ class MainActivity : ComponentActivity() {
         wifiConnectionObserver.stop()
     }
 
+    private fun prepareAnalysisSession() {
+        analysisSession = AnalysisSession(
+            state = AnalysisSessionState.READY,
+            ssid = connection?.ssid
+        )
+    }
+
     private fun restartObservation() {
         stopObservation()
         backendMessage = null
@@ -215,4 +243,10 @@ class MainActivity : ComponentActivity() {
             hasLocationPermission = permissionGranted
         )
     }
+}
+
+private enum class AppScreen {
+    CONNECTION,
+    ANALYSIS,
+    HISTORY
 }
