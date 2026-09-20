@@ -20,13 +20,14 @@ import androidx.compose.ui.unit.dp
 import com.anderson.wifiprevent.domain.model.AnalysisSession
 import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
+import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.ui.common.formatSecurityType
 
 @Composable
 fun AnalysisScreen(
     wifi: WifiSnapshot?,
     session: AnalysisSession?,
-    elapsedSeconds: Long,
+    metrics: TrafficMetrics,
     onBack: () -> Unit,
     onPrepare: () -> Unit,
     onStart: () -> Unit,
@@ -71,12 +72,21 @@ fun AnalysisScreen(
         }
 
         Text(
-            text = "Datos previstos para la siguiente etapa",
+            text = "Métricas de esta etapa",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
         Text("• Duración de la sesión")
         Text("• Cantidad de paquetes y bytes")
+        Text(
+            "Los contadores son agregados del teléfono durante el intervalo; " +
+                    "todavía no identifican aplicaciones ni contenido."
+        )
+        Text(
+            text = "Previsto para etapas posteriores",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
         Text("• Protocolos y puertos observados")
         Text("• Indicadores de conexiones sin cifrar")
 
@@ -113,15 +123,11 @@ fun AnalysisScreen(
                             "Esperando la autorización VPN del sistema."
                         )
                         AnalysisSessionState.ANALYZING -> {
-                            Text("Duración: ${formatDuration(elapsedSeconds)}")
-                            Text(
-                                "El servicio está activo, pero esta etapa todavía no " +
-                                        "redirige ni contabiliza paquetes."
-                            )
+                            MetricsContent(metrics, final = false)
                         }
                         AnalysisSessionState.COMPLETED -> {
-                            Text("Duración final: ${formatDuration(elapsedSeconds)}")
-                            Text("La sesión terminó sin capturar contenido de tráfico.")
+                            MetricsContent(metrics, final = true)
+                            Text("La sesión terminó sin almacenar contenido de tráfico.")
                         }
                         AnalysisSessionState.FAILED -> Text(
                             "Android no autorizó la sesión. Puedes preparar una nueva."
@@ -155,6 +161,24 @@ fun AnalysisScreen(
             }
         }
     }
+}
+
+@Composable
+private fun MetricsContent(metrics: TrafficMetrics, final: Boolean) {
+    Text(
+        "${if (final) "Duración final" else "Duración"}: " +
+                formatDuration(metrics.durationSeconds)
+    )
+    Text("Recibido: ${formatBytes(metrics.receivedBytes)}")
+    Text("Enviado: ${formatBytes(metrics.transmittedBytes)}")
+    Text("Paquetes recibidos: ${metrics.receivedPackets}")
+    Text("Paquetes enviados: ${metrics.transmittedPackets}")
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1_048_576 -> "%.2f MB".format(bytes / 1_048_576.0)
+    bytes >= 1_024 -> "%.2f KB".format(bytes / 1_024.0)
+    else -> "$bytes B"
 }
 
 private fun formatDuration(totalSeconds: Long): String {
