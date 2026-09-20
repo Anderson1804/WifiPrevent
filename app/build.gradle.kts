@@ -17,6 +17,10 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Dirección de la PC dentro de la red local. Si el router cambia esta
+        // dirección, solo debe actualizarse este valor para la compilación debug.
+        buildConfigField("String", "LOCAL_BACKEND_HOST", "\"192.168.18.207\"")
     }
 
     buildTypes {
@@ -32,6 +36,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
