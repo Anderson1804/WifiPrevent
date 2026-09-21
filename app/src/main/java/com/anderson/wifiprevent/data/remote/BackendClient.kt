@@ -11,6 +11,7 @@ import com.anderson.wifiprevent.domain.model.AnalysisHistoryEntry
 import com.anderson.wifiprevent.domain.model.AnalysisHistoryPage
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
+import com.anderson.wifiprevent.domain.model.TrafficIndicator
 import com.anderson.wifiprevent.data.local.StoredAnalysisSession
 import com.anderson.wifiprevent.domain.model.HistoryEntry
 import com.anderson.wifiprevent.domain.model.HistoryPage
@@ -159,6 +160,7 @@ class BackendClient(context: Context) {
                 put("http_packets", session.metadata.httpPackets)
                 put("tls_or_quic_packets", session.metadata.tlsOrQuicPackets)
                 put("unique_destinations", session.metadata.uniqueDestinations)
+                put("capture_mode", "controlled")
             }.toString()
             val reply = request("POST", "/api/v1/analysis-sessions", payload)
             require(reply.getString("status") == "completed") {
@@ -170,7 +172,9 @@ class BackendClient(context: Context) {
                 riskLevel = reply.nullableString("risk_level"),
                 riskReasons = reply.stringList("risk_reasons"),
                 assessmentScope = reply.nullableString("assessment_scope"),
-                trafficAnalysisPerformed = reply.getBoolean("traffic_analysis_performed")
+                trafficAnalysisPerformed = reply.getBoolean("traffic_analysis_performed"),
+                captureMode = reply.getString("capture_mode"),
+                indicators = reply.indicators("indicators")
             )
         }
 
@@ -210,7 +214,9 @@ class BackendClient(context: Context) {
                     riskLevel = row.nullableString("risk_level"),
                     riskReasons = row.stringList("risk_reasons"),
                     assessmentScope = row.nullableString("assessment_scope"),
-                    trafficAnalysisPerformed = row.getBoolean("traffic_analysis_performed")
+                    trafficAnalysisPerformed = row.getBoolean("traffic_analysis_performed"),
+                    captureMode = row.getString("capture_mode"),
+                    indicators = row.indicators("indicators")
                 )
             }
             AnalysisHistoryPage(entries, response.nullableString("next_before"))
@@ -236,5 +242,19 @@ private fun JSONObject.stringList(key: String): List<String> {
 
     return (0 until values.length()).map { index ->
         values.getString(index)
+    }
+}
+
+private fun JSONObject.indicators(key: String): List<TrafficIndicator> {
+    if (!has(key) || isNull(key)) return emptyList()
+    val values = getJSONArray(key)
+    return (0 until values.length()).map { index ->
+        val item = values.getJSONObject(index)
+        TrafficIndicator(
+            code = item.getString("code"),
+            severity = item.getString("severity"),
+            title = item.getString("title"),
+            description = item.getString("description")
+        )
     }
 }
