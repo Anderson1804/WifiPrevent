@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.anderson.wifiprevent.domain.model.AnalysisHistoryEntry
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.ui.common.formatSecurityType
+import com.anderson.wifiprevent.ui.common.formatRiskLevel
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -89,6 +90,18 @@ private fun AnalysisHistoryCard(entry: AnalysisHistoryEntry) {
             )
             Text(formatAnalysisDate(entry.receivedAt), style = MaterialTheme.typography.labelLarge)
             Text("Seguridad: ${formatSecurityType(entry.securityType)}")
+            Text(
+                "Evaluación preliminar: ${formatRiskLevel(entry.riskLevel, entry.assessmentScope != null)}",
+                fontWeight = FontWeight.Bold
+            )
+            entry.riskReasons.forEach { reason -> Text("• $reason") }
+            if (!entry.trafficAnalysisPerformed) {
+                Text(
+                    "Alcance actual: metadatos de conexión y volumen. La clasificación " +
+                            "por protocolos y destinos todavía no está implementada.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             AnalysisMetrics(entry.metrics)
             Text("Sesión: ${entry.id}", style = MaterialTheme.typography.bodySmall)
         }
