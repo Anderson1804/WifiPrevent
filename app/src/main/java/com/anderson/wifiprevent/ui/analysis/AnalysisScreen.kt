@@ -22,6 +22,7 @@ import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
+import com.anderson.wifiprevent.data.vpn.SocksRelayStatus
 import com.anderson.wifiprevent.ui.common.formatSecurityType
 
 @Composable
@@ -33,11 +34,14 @@ fun AnalysisScreen(
     uploadMessage: String?,
     uploadError: Boolean,
     uploading: Boolean,
+    relayStatus: SocksRelayStatus?,
+    checkingRelay: Boolean,
     onBack: () -> Unit,
     onPrepare: () -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
     onRetryUpload: () -> Unit,
+    onCheckRelay: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -98,6 +102,38 @@ fun AnalysisScreen(
             "La captura completa permanecerá deshabilitada hasta integrar y verificar " +
                     "el motor que reenvía los paquetes sin interrumpir Internet."
         )
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Transporte de desarrollo",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    relayStatus?.message
+                        ?: "Comprueba si el relé SOCKS5 de la PC responde al emulador.",
+                    color = if (relayStatus?.available == false) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
+                )
+                Text(
+                    "Esta comprobación valida el enlace con la PC; todavía no activa la captura completa.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                OutlinedButton(
+                    onClick = onCheckRelay,
+                    enabled = !checkingRelay,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (checkingRelay) "Comprobando…" else "Comprobar relé local")
+                }
+            }
+        }
 
         if (session == null) {
             Button(
