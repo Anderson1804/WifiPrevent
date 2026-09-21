@@ -15,7 +15,7 @@ from app.schemas.analysis_session import (
     AnalysisSessionReading,
     AnalysisSessionReceipt,
 )
-from app.services import evaluate_analysis_risk
+from app.services import evaluate_analysis_risk, evaluate_traffic_indicators
 
 
 router = APIRouter(prefix="/api/v1/analysis-sessions", tags=["analysis-sessions"])
@@ -34,6 +34,14 @@ def save_analysis_session(
         received_packets=reading.received_packets,
         transmitted_packets=reading.transmitted_packets,
     )
+    indicators = evaluate_traffic_indicators(
+        capture_mode=reading.capture_mode,
+        parsed_packets=reading.parsed_packets,
+        unparsed_packets=reading.unparsed_packets,
+        ipv4_packets=reading.ipv4_packets,
+        ipv6_packets=reading.ipv6_packets,
+        http_packets=reading.http_packets,
+    )
     statement = (
         insert(AnalysisSessionRecord)
         .values(
@@ -44,6 +52,7 @@ def save_analysis_session(
             risk_reasons=list(assessment.reasons),
             assessment_scope="connection_metadata",
             traffic_analysis_performed=False,
+            indicators=[indicator.__dict__ for indicator in indicators],
         )
         .on_conflict_do_nothing(index_elements=[AnalysisSessionRecord.session_id])
     )
@@ -73,6 +82,8 @@ def save_analysis_session(
         risk_reasons=row.risk_reasons,
         assessment_scope=row.assessment_scope,
         traffic_analysis_performed=row.traffic_analysis_performed,
+        capture_mode=row.capture_mode,
+        indicators=row.indicators,
     )
 
 
