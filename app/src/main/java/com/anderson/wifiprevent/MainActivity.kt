@@ -480,7 +480,15 @@ class MainActivity : ComponentActivity() {
             try {
                 val receipt = connectionRepository.saveAnalysis(stored)
                 analysisSessionStore.markUploaded(receipt.sessionId)
-                analysisUploadMessage = receipt.message
+                val reasons = receipt.riskReasons.joinToString(separator = "\n") { "• $it" }
+                analysisUploadMessage = buildString {
+                    append("${receipt.message}\n")
+                    append("Evaluación preliminar: ${formatRiskLevel(receipt.riskLevel, true)}")
+                    if (reasons.isNotBlank()) append("\n$reasons")
+                    if (!receipt.trafficAnalysisPerformed) {
+                        append("\nEl análisis por protocolos y destinos todavía no está implementado.")
+                    }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
