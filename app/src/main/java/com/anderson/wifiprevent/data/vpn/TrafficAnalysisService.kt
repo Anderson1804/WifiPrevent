@@ -14,9 +14,11 @@ import com.anderson.wifiprevent.data.local.AnalysisSessionStore
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataAccumulator
 import java.io.FileInputStream
 import java.io.IOException
-import java.net.DatagramPacket
-import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.StandardProtocolFamily
+import java.nio.ByteBuffer
+import java.nio.channels.DatagramChannel
 
 class TrafficAnalysisService : VpnService() {
     private val sessionStore by lazy { AnalysisSessionStore(this) }
@@ -80,7 +82,7 @@ class TrafficAnalysisService : VpnService() {
         val established = Builder()
             .setSession("WiFiPrevent - validación controlada")
             .setMtu(1500)
-            .addAddress("10.77.0.2", 32)
+            .addAddress(TUN_ADDRESS, 32)
             .addRoute(TEST_NETWORK, 24)
             .setBlocking(true)
             .establish() ?: return false
@@ -116,15 +118,19 @@ class TrafficAnalysisService : VpnService() {
             Triple("203.0.113.3", 9_999, "other")
         )
         runCatching {
-            DatagramSocket().use { socket ->
+            DatagramChannel.open(StandardProtocolFamily.INET).use { channel ->
+                channel.bind(
+                    InetSocketAddress(InetAddress.getByName(TUN_ADDRESS), 0)
+                )
                 probes.forEach { (address, port, label) ->
                     val payload = "wifiprevent-$label".toByteArray(Charsets.UTF_8)
-                    socket.send(
-                        DatagramPacket(payload, payload.size, InetAddress.getByName(address), port)
+                    channel.send(
+                        ByteBuffer.wrap(payload),
+                        InetSocketAddress(InetAddress.getByName(address), port)
                     )
                 }
             }
-        }
+        }.onFailure { sessionStore.fail() }
     }
 
     private fun stopControlledCapture() {
@@ -212,5 +218,6 @@ class TrafficAnalysisService : VpnService() {
         private const val CHANNEL_ID = "traffic_analysis"
         private const val NOTIFICATION_ID = 2001
         private const val TEST_NETWORK = "203.0.113.0"
+        private const val TUN_ADDRESS = "10.77.0.2"
     }
 }
