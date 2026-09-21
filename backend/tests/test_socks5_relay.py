@@ -1,6 +1,7 @@
 import asyncio
 import socket
 import threading
+import socketserver
 
 from socks5_relay import handle_client
 
@@ -86,3 +87,44 @@ def test_rejects_unsupported_commands():
             negotiate(connection)
             connection.sendall(b"\x05\x02\x00\x01\x7f\x00\x00\x01\x00\x50")
             assert receive_exact(connection, 10)[1] == 7
+
+
+class UdpEchoHandler(socketserver.BaseRequestHandler):
+    def handle(self):
+        data, connection = self.request
+        connection.sendto(data, self.client_address)
+
+
+def test_udp_associate_relays_datagrams_without_storing_payload():
+    with socketserver.ThreadingUDPServer(("127.0.0.1", 0), UdpEchoHandler) as destination:
+        destination_thread = threading.Thread(
+            target=destination.serve_forever, daemon=True
+        )
+        destination_thread.start()
+        try:
+            with AsyncServerThread(handle_client) as relay:
+                with socket.create_connection(
+                    ("127.0.0.1", relay.port), timeout=3
+                ) as control:
+                    negotiate(control)
+                    control.sendall(
+                        b"\x05\x03\x00\x01\x00\x00\x00\x00\x00\x00"
+                    )
+                    reply = receive_exact(control, 10)
+                    assert reply[1] == 0
+                    relay_port = int.from_bytes(reply[-2:], "big")
+                    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
+                        udp.settimeout(3)
+                        payload = b"wifiprevent udp test"
+                        header = (
+                            b"\x00\x00\x00\x01" +
+                            socket.inet_aton("127.0.0.1") +
+                            destination.server_address[1].to_bytes(2, "big")
+                        )
+                        udp.sendto(header + payload, ("127.0.0.1", relay_port))
+                        response, _ = udp.recvfrom(4096)
+                        assert response[10:] == payload
+        finally:
+            destination.shutdown()
+            destination.server_close()
+            destination_thread.join(3)

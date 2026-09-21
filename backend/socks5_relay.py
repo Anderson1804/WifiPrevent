@@ -1,4 +1,4 @@
-"""Local SOCKS5 TCP relay used by the WiFiPrevent development tunnel."""
+"""Local SOCKS5 TCP/UDP relay used by the WiFiPrevent development tunnel."""
 
 import argparse
 import asyncio
@@ -49,6 +49,73 @@ async def copy_stream(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
             pass
 
 
+def encode_udp_address(host: str, port: int) -> bytes:
+    address = ipaddress.ip_address(host)
+    address_type = 1 if address.version == 4 else 4
+    return bytes((0, 0, 0, address_type)) + address.packed + port.to_bytes(2, "big")
+
+
+def decode_udp_request(data: bytes):
+    if len(data) < 4 or data[:2] != b"\x00\x00" or data[2] != 0:
+        return None
+    address_type = data[3]
+    offset = 4
+    try:
+        if address_type == 1:
+            if len(data) < offset + 6:
+                return None
+            host = str(ipaddress.IPv4Address(data[offset:offset + 4]))
+            offset += 4
+        elif address_type == 4:
+            if len(data) < offset + 18:
+                return None
+            host = str(ipaddress.IPv6Address(data[offset:offset + 16]))
+            offset += 16
+        elif address_type == 3:
+            if len(data) < offset + 1:
+                return None
+            length = data[offset]
+            offset += 1
+            if len(data) < offset + length + 2:
+                return None
+            host = data[offset:offset + length].decode("idna")
+            offset += length
+        else:
+            return None
+        port = int.from_bytes(data[offset:offset + 2], "big")
+        return host, port, data[offset + 2:]
+    except (ValueError, UnicodeError):
+        return None
+
+
+class UdpAssociation(asyncio.DatagramProtocol):
+    def __init__(self, allowed_client_host: str):
+        self.allowed_client_host = allowed_client_host
+        self.client = None
+        self.transport = None
+
+    def connection_made(self, transport):
+        self.transport = transport
+
+    def datagram_received(self, data: bytes, address):
+        if address == self.client or (
+            self.client is None and address[0] == self.allowed_client_host
+        ):
+            request = decode_udp_request(data)
+            if request is None:
+                return
+            self.client = address
+            host, port, payload = request
+            self.transport.sendto(payload, (host, port))
+            return
+        if self.client is not None:
+            try:
+                response = encode_udp_address(address[0], address[1]) + data
+            except ValueError:
+                return
+            self.transport.sendto(response, self.client)
+
+
 async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
     upstream_writer = None
     try:
@@ -65,7 +132,7 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         if version != SOCKS_VERSION or reserved != 0:
             await send_reply(writer, 1)
             return
-        if command != 1:
+        if command not in (1, 3):
             await send_reply(writer, 7)
             return
         try:
@@ -74,6 +141,21 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
             await send_reply(writer, 8)
             return
         port = int.from_bytes(await reader.readexactly(2), "big")
+
+        if command == 3:
+            loop = asyncio.get_running_loop()
+            client_host = writer.get_extra_info("peername")[0]
+            transport, _ = await loop.create_datagram_endpoint(
+                lambda: UdpAssociation(client_host),
+                local_addr=("127.0.0.1", 0),
+            )
+            try:
+                await send_reply(writer, 0, transport.get_extra_info("sockname"))
+                LOGGER.info("Asociación UDP iniciada")
+                await reader.read()
+            finally:
+                transport.close()
+            return
 
         try:
             upstream_reader, upstream_writer = await asyncio.wait_for(
