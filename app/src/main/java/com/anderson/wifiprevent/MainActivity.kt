@@ -31,10 +31,12 @@ import com.anderson.wifiprevent.data.vpn.TrafficAnalysisService
 import com.anderson.wifiprevent.domain.model.AnalysisSession
 import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.HistoryEntry
+import com.anderson.wifiprevent.domain.model.AnalysisHistoryEntry
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
 import com.anderson.wifiprevent.ui.connection.ConnectionScreen
 import com.anderson.wifiprevent.ui.analysis.AnalysisScreen
+import com.anderson.wifiprevent.ui.analysis.AnalysisHistoryScreen
 import com.anderson.wifiprevent.ui.history.HistoryScreen
 import com.anderson.wifiprevent.ui.common.formatRiskLevel
 import com.anderson.wifiprevent.ui.theme.WifiPreventTheme
@@ -68,6 +70,11 @@ class MainActivity : ComponentActivity() {
     private var historyError by mutableStateOf<String?>(null)
     private var historyCursor: String? = null
     private var historyHasMore by mutableStateOf(false)
+    private var analysisHistoryEntries by mutableStateOf<List<AnalysisHistoryEntry>>(emptyList())
+    private var analysisHistoryLoading by mutableStateOf(false)
+    private var analysisHistoryError by mutableStateOf<String?>(null)
+    private var analysisHistoryCursor: String? = null
+    private var analysisHistoryHasMore by mutableStateOf(false)
     private var connection by mutableStateOf<WifiSnapshot?>(null)
     private var permissionGranted by mutableStateOf(false)
     private var locationEnabled by mutableStateOf(false)
@@ -104,8 +111,14 @@ class MainActivity : ComponentActivity() {
     private val localNetworkPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (currentScreen == AppScreen.HISTORY) historyError = if (granted) "Permiso concedido. Pulsa Actualizar historial."
-            else "Permiso de red local requerido. Habilítalo desde los permisos de la aplicación."
+        if (currentScreen == AppScreen.HISTORY) {
+            historyError = if (granted) "Permiso concedido. Pulsa Actualizar historial."
+                else "Permiso de red local requerido. Habilítalo desde los permisos de la aplicación."
+        }
+        if (currentScreen == AppScreen.ANALYSIS_HISTORY) {
+            analysisHistoryError = if (granted) "Permiso concedido. Pulsa Actualizar análisis."
+                else "Permiso de red local requerido. Habilítalo desde los permisos de la aplicación."
+        }
         backendError = !granted
         backendMessage = if (granted) "Permiso concedido. Pulsa Guardar consulta."
             else "El envío requiere permiso de red local. Puedes habilitarlo en los permisos de la aplicación."
@@ -150,6 +163,17 @@ class MainActivity : ComponentActivity() {
                         currentScreen = AppScreen.CONNECTION
                     }
                     when (currentScreen) {
+                        AppScreen.ANALYSIS_HISTORY -> AnalysisHistoryScreen(
+                            entries = analysisHistoryEntries,
+                            loading = analysisHistoryLoading,
+                            error = analysisHistoryError,
+                            hasMore = analysisHistoryHasMore,
+                            onBack = { currentScreen = AppScreen.CONNECTION },
+                            onRefresh = { loadAnalysisHistory() },
+                            onMore = { loadAnalysisHistory(more = true) },
+                            modifier = Modifier.padding(padding)
+                        )
+
                         AppScreen.HISTORY -> HistoryScreen(
                             historyEntries,
                             historyLoading,
@@ -191,6 +215,10 @@ class MainActivity : ComponentActivity() {
                         onHistory = {
                             currentScreen = AppScreen.HISTORY
                             loadHistory()
+                        },
+                        onAnalysisHistory = {
+                            currentScreen = AppScreen.ANALYSIS_HISTORY
+                            loadAnalysisHistory()
                         },
                         modifier = Modifier.padding(padding)
                     )
@@ -282,6 +310,39 @@ class MainActivity : ComponentActivity() {
 
     private fun stopObservation() {
         wifiConnectionObserver.stop()
+    }
+
+    private fun loadAnalysisHistory(more: Boolean = false) {
+        if (analysisHistoryLoading) return
+        if (Build.VERSION.SDK_INT >= 37 && ContextCompat.checkSelfPermission(
+                this, "android.permission.ACCESS_LOCAL_NETWORK"
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            localNetworkPermission.launch("android.permission.ACCESS_LOCAL_NETWORK")
+            return
+        }
+        val cursor = if (more) analysisHistoryCursor else null
+        if (more && cursor == null) return
+        analysisHistoryLoading = true
+        analysisHistoryError = null
+        lifecycleScope.launch {
+            try {
+                val page = connectionRepository.getAnalysisHistory(cursor)
+                analysisHistoryEntries = if (more) {
+                    (analysisHistoryEntries + page.entries).distinctBy { it.id }
+                } else {
+                    page.entries
+                }
+                analysisHistoryCursor = page.nextBefore
+                analysisHistoryHasMore = page.nextBefore != null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                analysisHistoryError = e.message ?: "No se pudo consultar el historial de análisis."
+            } finally {
+                analysisHistoryLoading = false
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -453,5 +514,6 @@ class MainActivity : ComponentActivity() {
 private enum class AppScreen {
     CONNECTION,
     ANALYSIS,
+    ANALYSIS_HISTORY,
     HISTORY
 }
