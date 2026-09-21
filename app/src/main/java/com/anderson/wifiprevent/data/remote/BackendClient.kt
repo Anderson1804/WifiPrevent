@@ -7,6 +7,9 @@ import com.anderson.wifiprevent.BuildConfig
 import com.anderson.wifiprevent.data.local.InstallationStore
 import com.anderson.wifiprevent.domain.model.ConnectionReceipt
 import com.anderson.wifiprevent.domain.model.AnalysisReceipt
+import com.anderson.wifiprevent.domain.model.AnalysisHistoryEntry
+import com.anderson.wifiprevent.domain.model.AnalysisHistoryPage
+import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.data.local.StoredAnalysisSession
 import com.anderson.wifiprevent.domain.model.HistoryEntry
 import com.anderson.wifiprevent.domain.model.HistoryPage
@@ -152,6 +155,30 @@ class BackendClient(context: Context) {
                 sessionId = reply.getString("session_id"),
                 message = reply.getString("message")
             )
+        }
+
+    suspend fun analysisHistory(before: String? = null): AnalysisHistoryPage =
+        withContext(Dispatchers.IO) {
+            val cursor = before?.let { "&before=${UUID.fromString(it)}" } ?: ""
+            val response = request("GET", "/api/v1/analysis-sessions?limit=20$cursor")
+            val array = response.getJSONArray("items")
+            val entries = (0 until array.length()).map { index ->
+                val row = array.getJSONObject(index)
+                AnalysisHistoryEntry(
+                    id = row.getString("session_id"),
+                    receivedAt = row.getString("received_at"),
+                    ssid = row.nullableString("ssid"),
+                    securityType = row.nullableString("security_type"),
+                    metrics = TrafficMetrics(
+                        durationSeconds = row.getLong("duration_seconds"),
+                        receivedBytes = row.getLong("received_bytes"),
+                        transmittedBytes = row.getLong("transmitted_bytes"),
+                        receivedPackets = row.getLong("received_packets"),
+                        transmittedPackets = row.getLong("transmitted_packets")
+                    )
+                )
+            }
+            AnalysisHistoryPage(entries, response.nullableString("next_before"))
         }
 
     private fun isRunningOnEmulator(): Boolean {
