@@ -10,6 +10,7 @@ import com.anderson.wifiprevent.domain.model.AnalysisReceipt
 import com.anderson.wifiprevent.domain.model.AnalysisHistoryEntry
 import com.anderson.wifiprevent.domain.model.AnalysisHistoryPage
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
+import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
 import com.anderson.wifiprevent.data.local.StoredAnalysisSession
 import com.anderson.wifiprevent.domain.model.HistoryEntry
 import com.anderson.wifiprevent.domain.model.HistoryPage
@@ -146,6 +147,18 @@ class BackendClient(context: Context) {
                 put("transmitted_bytes", session.metrics.transmittedBytes)
                 put("received_packets", session.metrics.receivedPackets)
                 put("transmitted_packets", session.metrics.transmittedPackets)
+                put("parsed_packets", session.metadata.parsedPackets)
+                put("unparsed_packets", session.metadata.unparsedPackets)
+                put("ipv4_packets", session.metadata.ipv4Packets)
+                put("ipv6_packets", session.metadata.ipv6Packets)
+                put("tcp_packets", session.metadata.tcpPackets)
+                put("udp_packets", session.metadata.udpPackets)
+                put("icmp_packets", session.metadata.icmpPackets)
+                put("other_transport_packets", session.metadata.otherTransportPackets)
+                put("dns_packets", session.metadata.dnsPackets)
+                put("http_packets", session.metadata.httpPackets)
+                put("tls_or_quic_packets", session.metadata.tlsOrQuicPackets)
+                put("unique_destinations", session.metadata.uniqueDestinations)
             }.toString()
             val reply = request("POST", "/api/v1/analysis-sessions", payload)
             require(reply.getString("status") == "completed") {
@@ -179,6 +192,20 @@ class BackendClient(context: Context) {
                         transmittedBytes = row.getLong("transmitted_bytes"),
                         receivedPackets = row.getLong("received_packets"),
                         transmittedPackets = row.getLong("transmitted_packets")
+                    ),
+                    metadata = TrafficMetadataSummary(
+                        parsedPackets = row.getLong("parsed_packets"),
+                        unparsedPackets = row.getLong("unparsed_packets"),
+                        ipv4Packets = row.getLong("ipv4_packets"),
+                        ipv6Packets = row.getLong("ipv6_packets"),
+                        tcpPackets = row.getLong("tcp_packets"),
+                        udpPackets = row.getLong("udp_packets"),
+                        icmpPackets = row.getLong("icmp_packets"),
+                        otherTransportPackets = row.getLong("other_transport_packets"),
+                        dnsPackets = row.getLong("dns_packets"),
+                        httpPackets = row.getLong("http_packets"),
+                        tlsOrQuicPackets = row.getLong("tls_or_quic_packets"),
+                        uniqueDestinations = row.getInt("unique_destinations")
                     ),
                     riskLevel = row.nullableString("risk_level"),
                     riskReasons = row.stringList("risk_reasons"),
