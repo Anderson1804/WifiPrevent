@@ -34,9 +34,10 @@ class TrafficAnalysisService : VpnService() {
 
             else -> {
                 val networkName = intent?.getStringExtra(EXTRA_NETWORK_NAME)
+                val securityType = intent?.getStringExtra(EXTRA_SECURITY_TYPE)
                 val sessionId = intent?.getStringExtra(EXTRA_SESSION_ID)
                     ?: return START_NOT_STICKY
-                sessionStore.start(sessionId, networkName)
+                sessionStore.start(sessionId, networkName, securityType)
                 startAsForeground(networkName)
                 START_NOT_STICKY
             }
@@ -122,6 +123,7 @@ class TrafficAnalysisService : VpnService() {
             "com.anderson.wifiprevent.action.STOP_TRAFFIC_ANALYSIS"
         const val EXTRA_NETWORK_NAME = "network_name"
         const val EXTRA_SESSION_ID = "session_id"
+        const val EXTRA_SECURITY_TYPE = "security_type"
 
         private const val CHANNEL_ID = "traffic_analysis"
         private const val NOTIFICATION_ID = 2001
