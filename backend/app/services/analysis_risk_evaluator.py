@@ -24,6 +24,6 @@ def evaluate_analysis_risk(
     return RiskAssessment(
         level=connection_assessment.level,
         reasons=connection_assessment.reasons + (
-            "La sesión reunió una muestra de volumen, pero todavía no clasifica protocolos, destinos ni contenido.",
+            "La sesión clasificó una muestra controlada de protocolos y destinos; todavía no representa todo el tráfico ni inspecciona contenido.",
         ),
     )
