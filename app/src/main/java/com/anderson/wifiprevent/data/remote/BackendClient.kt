@@ -6,6 +6,8 @@ import android.os.Build
 import com.anderson.wifiprevent.BuildConfig
 import com.anderson.wifiprevent.data.local.InstallationStore
 import com.anderson.wifiprevent.domain.model.ConnectionReceipt
+import com.anderson.wifiprevent.domain.model.AnalysisReceipt
+import com.anderson.wifiprevent.data.local.StoredAnalysisSession
 import com.anderson.wifiprevent.domain.model.HistoryEntry
 import com.anderson.wifiprevent.domain.model.HistoryPage
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
@@ -129,6 +131,28 @@ class BackendClient(context: Context) {
             connection.disconnect()
         }
     }
+
+    suspend fun sendAnalysis(session: StoredAnalysisSession): AnalysisReceipt =
+        withContext(Dispatchers.IO) {
+            val payload = JSONObject().apply {
+                put("session_id", session.id)
+                put("ssid", session.ssid ?: JSONObject.NULL)
+                put("security_type", session.securityType ?: JSONObject.NULL)
+                put("duration_seconds", session.metrics.durationSeconds)
+                put("received_bytes", session.metrics.receivedBytes)
+                put("transmitted_bytes", session.metrics.transmittedBytes)
+                put("received_packets", session.metrics.receivedPackets)
+                put("transmitted_packets", session.metrics.transmittedPackets)
+            }.toString()
+            val reply = request("POST", "/api/v1/analysis-sessions", payload)
+            require(reply.getString("status") == "completed") {
+                "El servidor devolvió una respuesta inesperada para la sesión."
+            }
+            AnalysisReceipt(
+                sessionId = reply.getString("session_id"),
+                message = reply.getString("message")
+            )
+        }
 
     private fun isRunningOnEmulator(): Boolean {
         return Build.FINGERPRINT.startsWith("generic") ||
