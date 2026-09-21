@@ -17,6 +17,18 @@ class AnalysisSessionReading(BaseModel):
     transmitted_bytes: int = Field(ge=0)
     received_packets: int = Field(ge=0)
     transmitted_packets: int = Field(ge=0)
+    parsed_packets: int = Field(default=0, ge=0)
+    unparsed_packets: int = Field(default=0, ge=0)
+    ipv4_packets: int = Field(default=0, ge=0)
+    ipv6_packets: int = Field(default=0, ge=0)
+    tcp_packets: int = Field(default=0, ge=0)
+    udp_packets: int = Field(default=0, ge=0)
+    icmp_packets: int = Field(default=0, ge=0)
+    other_transport_packets: int = Field(default=0, ge=0)
+    dns_packets: int = Field(default=0, ge=0)
+    http_packets: int = Field(default=0, ge=0)
+    tls_or_quic_packets: int = Field(default=0, ge=0)
+    unique_destinations: int = Field(default=0, ge=0)
 
 
 class AnalysisSessionReceipt(BaseModel):
@@ -42,6 +54,18 @@ class AnalysisSessionItem(BaseModel):
     transmitted_bytes: int
     received_packets: int
     transmitted_packets: int
+    parsed_packets: int = 0
+    unparsed_packets: int = 0
+    ipv4_packets: int = 0
+    ipv6_packets: int = 0
+    tcp_packets: int = 0
+    udp_packets: int = 0
+    icmp_packets: int = 0
+    other_transport_packets: int = 0
+    dns_packets: int = 0
+    http_packets: int = 0
+    tls_or_quic_packets: int = 0
+    unique_destinations: int = 0
     risk_level: Literal["low", "medium", "high", "unknown"] | None = None
     risk_reasons: list[str] | None = None
     assessment_scope: Literal["connection_metadata"] | None = None
