@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, Index, String, Uuid
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, Index, JSON, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -28,3 +28,7 @@ class AnalysisSessionRecord(Base):
     transmitted_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     received_packets: Mapped[int] = mapped_column(BigInteger, nullable=False)
     transmitted_packets: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    risk_level: Mapped[str | None] = mapped_column(String(32))
+    risk_reasons: Mapped[list[str] | None] = mapped_column(JSON)
+    assessment_scope: Mapped[str | None] = mapped_column(String(32))
+    traffic_analysis_performed: Mapped[bool] = mapped_column(Boolean, default=False)
