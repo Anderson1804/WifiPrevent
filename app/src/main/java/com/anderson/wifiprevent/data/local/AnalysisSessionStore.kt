@@ -5,6 +5,7 @@ import android.net.TrafficStats
 import android.os.SystemClock
 import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
+import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
 import kotlin.math.max
 
 data class StoredAnalysisSession(
@@ -13,6 +14,7 @@ data class StoredAnalysisSession(
     val securityType: String?,
     val state: AnalysisSessionState,
     val metrics: TrafficMetrics,
+    val metadata: TrafficMetadataSummary,
     val uploaded: Boolean
 )
 
@@ -39,6 +41,7 @@ class AnalysisSessionStore(context: Context) {
             .remove("final_rx_packets")
             .remove("final_tx_packets")
             .putBoolean("uploaded", false)
+            .putMetadata(TrafficMetadataSummary.EMPTY)
             .commit()
     }
 
@@ -57,6 +60,14 @@ class AnalysisSessionStore(context: Context) {
 
     fun clear() {
         preferences.edit().clear().commit()
+    }
+
+    fun updateMetadata(summary: TrafficMetadataSummary) {
+        preferences.edit().putMetadata(summary).apply()
+    }
+
+    fun fail() {
+        preferences.edit().putString("state", AnalysisSessionState.FAILED.name).commit()
     }
 
     fun markUploaded(sessionId: String) {
@@ -89,9 +100,25 @@ class AnalysisSessionStore(context: Context) {
             preferences.getString("security_type", null),
             state,
             metrics,
+            metadataSnapshot(),
             preferences.getBoolean("uploaded", false)
         )
     }
+
+    private fun metadataSnapshot() = TrafficMetadataSummary(
+        parsedPackets = preferences.getLong("metadata_parsed", 0),
+        unparsedPackets = preferences.getLong("metadata_unparsed", 0),
+        ipv4Packets = preferences.getLong("metadata_ipv4", 0),
+        ipv6Packets = preferences.getLong("metadata_ipv6", 0),
+        tcpPackets = preferences.getLong("metadata_tcp", 0),
+        udpPackets = preferences.getLong("metadata_udp", 0),
+        icmpPackets = preferences.getLong("metadata_icmp", 0),
+        otherTransportPackets = preferences.getLong("metadata_other", 0),
+        dnsPackets = preferences.getLong("metadata_dns", 0),
+        httpPackets = preferences.getLong("metadata_http", 0),
+        tlsOrQuicPackets = preferences.getLong("metadata_tls_quic", 0),
+        uniqueDestinations = preferences.getInt("metadata_destinations", 0)
+    )
 
     private fun liveMetrics(): TrafficMetrics {
         val startedAt = preferences.getLong("started_at", SystemClock.elapsedRealtime())
@@ -112,3 +139,19 @@ class AnalysisSessionStore(context: Context) {
     private fun counter(value: Long): Long =
         if (value == TrafficStats.UNSUPPORTED.toLong()) 0 else max(0, value)
 }
+
+private fun android.content.SharedPreferences.Editor.putMetadata(
+    summary: TrafficMetadataSummary
+): android.content.SharedPreferences.Editor =
+    putLong("metadata_parsed", summary.parsedPackets)
+        .putLong("metadata_unparsed", summary.unparsedPackets)
+        .putLong("metadata_ipv4", summary.ipv4Packets)
+        .putLong("metadata_ipv6", summary.ipv6Packets)
+        .putLong("metadata_tcp", summary.tcpPackets)
+        .putLong("metadata_udp", summary.udpPackets)
+        .putLong("metadata_icmp", summary.icmpPackets)
+        .putLong("metadata_other", summary.otherTransportPackets)
+        .putLong("metadata_dns", summary.dnsPackets)
+        .putLong("metadata_http", summary.httpPackets)
+        .putLong("metadata_tls_quic", summary.tlsOrQuicPackets)
+        .putInt("metadata_destinations", summary.uniqueDestinations)
