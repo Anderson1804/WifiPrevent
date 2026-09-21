@@ -153,7 +153,11 @@ class BackendClient(context: Context) {
             }
             AnalysisReceipt(
                 sessionId = reply.getString("session_id"),
-                message = reply.getString("message")
+                message = reply.getString("message"),
+                riskLevel = reply.nullableString("risk_level"),
+                riskReasons = reply.stringList("risk_reasons"),
+                assessmentScope = reply.nullableString("assessment_scope"),
+                trafficAnalysisPerformed = reply.getBoolean("traffic_analysis_performed")
             )
         }
 
@@ -175,7 +179,11 @@ class BackendClient(context: Context) {
                         transmittedBytes = row.getLong("transmitted_bytes"),
                         receivedPackets = row.getLong("received_packets"),
                         transmittedPackets = row.getLong("transmitted_packets")
-                    )
+                    ),
+                    riskLevel = row.nullableString("risk_level"),
+                    riskReasons = row.stringList("risk_reasons"),
+                    assessmentScope = row.nullableString("assessment_scope"),
+                    trafficAnalysisPerformed = row.getBoolean("traffic_analysis_performed")
                 )
             }
             AnalysisHistoryPage(entries, response.nullableString("next_before"))
