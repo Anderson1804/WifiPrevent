@@ -16,6 +16,14 @@ class AnalysisSessionRecord(Base):
         CheckConstraint("transmitted_bytes >= 0", name="ck_analysis_tx_bytes"),
         CheckConstraint("received_packets >= 0", name="ck_analysis_rx_packets"),
         CheckConstraint("transmitted_packets >= 0", name="ck_analysis_tx_packets"),
+        CheckConstraint(
+            "parsed_packets >= 0 AND unparsed_packets >= 0 AND ipv4_packets >= 0 "
+            "AND ipv6_packets >= 0 AND tcp_packets >= 0 AND udp_packets >= 0 "
+            "AND icmp_packets >= 0 AND other_transport_packets >= 0 "
+            "AND dns_packets >= 0 AND http_packets >= 0 AND tls_or_quic_packets >= 0 "
+            "AND unique_destinations >= 0",
+            name="ck_analysis_metadata_nonnegative",
+        ),
     )
 
     session_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
@@ -28,6 +36,18 @@ class AnalysisSessionRecord(Base):
     transmitted_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     received_packets: Mapped[int] = mapped_column(BigInteger, nullable=False)
     transmitted_packets: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    parsed_packets: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    unparsed_packets: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    ipv4_packets: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    ipv6_packets: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    tcp_packets: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    udp_packets: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    icmp_packets: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    other_transport_packets: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    dns_packets: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    http_packets: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    tls_or_quic_packets: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    unique_destinations: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     risk_level: Mapped[str | None] = mapped_column(String(32))
     risk_reasons: Mapped[list[str] | None] = mapped_column(JSON)
     assessment_scope: Mapped[str | None] = mapped_column(String(32))
