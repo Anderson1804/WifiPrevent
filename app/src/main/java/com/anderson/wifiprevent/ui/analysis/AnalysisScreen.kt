@@ -28,10 +28,14 @@ fun AnalysisScreen(
     wifi: WifiSnapshot?,
     session: AnalysisSession?,
     metrics: TrafficMetrics,
+    uploadMessage: String?,
+    uploadError: Boolean,
+    uploading: Boolean,
     onBack: () -> Unit,
     onPrepare: () -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
+    onRetryUpload: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -128,6 +132,13 @@ fun AnalysisScreen(
                         AnalysisSessionState.COMPLETED -> {
                             MetricsContent(metrics, final = true)
                             Text("La sesión terminó sin almacenar contenido de tráfico.")
+                            uploadMessage?.let {
+                                Text(
+                                    it,
+                                    color = if (uploadError) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                         AnalysisSessionState.FAILED -> Text(
                             "Android no autorizó la sesión. Puedes preparar una nueva."
@@ -154,10 +165,21 @@ fun AnalysisScreen(
 
             OutlinedButton(
                 onClick = onPrepare,
-                enabled = session.state != AnalysisSessionState.ANALYZING,
+                enabled = session.state != AnalysisSessionState.ANALYZING &&
+                        !(session.state == AnalysisSessionState.COMPLETED &&
+                                (uploading || uploadError)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Preparar una sesión nueva")
+            }
+            if (session.state == AnalysisSessionState.COMPLETED && uploadError) {
+                OutlinedButton(
+                    onClick = onRetryUpload,
+                    enabled = !uploading,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (uploading) "Enviando…" else "Reintentar guardado")
+                }
             }
         }
     }
