@@ -15,7 +15,11 @@ data class TrafficMetadataSummary(
     val httpPackets: Long,
     val tlsOrQuicPackets: Long,
     val uniqueDestinations: Int
-)
+) {
+    companion object {
+        val EMPTY = TrafficMetadataSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    }
+}
 
 class TrafficMetadataAccumulator {
     private var parsedPackets = 0L
