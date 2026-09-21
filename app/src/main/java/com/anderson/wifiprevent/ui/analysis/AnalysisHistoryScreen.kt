@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.anderson.wifiprevent.domain.model.AnalysisHistoryEntry
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
+import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
 import com.anderson.wifiprevent.ui.common.formatSecurityType
 import com.anderson.wifiprevent.ui.common.formatRiskLevel
 import java.time.OffsetDateTime
@@ -97,14 +98,30 @@ private fun AnalysisHistoryCard(entry: AnalysisHistoryEntry) {
             entry.riskReasons.forEach { reason -> Text("• $reason") }
             if (!entry.trafficAnalysisPerformed) {
                 Text(
-                    "Alcance actual: metadatos de conexión y volumen. La clasificación " +
-                            "por protocolos y destinos todavía no está implementada.",
+                    "Alcance actual: metadatos de conexión y una muestra controlada de " +
+                            "protocolos y destinos. Todavía no representa todo el tráfico.",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
             AnalysisMetrics(entry.metrics)
+            StoredMetadata(entry.metadata)
             Text("Sesión: ${entry.id}", style = MaterialTheme.typography.bodySmall)
         }
+    }
+}
+
+@Composable
+private fun StoredMetadata(metadata: TrafficMetadataSummary) {
+    Text("Metadatos controlados", fontWeight = FontWeight.Bold)
+    Text("Interpretados: ${metadata.parsedPackets}")
+    Text("IPv4: ${metadata.ipv4Packets} · IPv6: ${metadata.ipv6Packets}")
+    Text("TCP: ${metadata.tcpPackets} · UDP: ${metadata.udpPackets}")
+    Text("ICMP: ${metadata.icmpPackets} · Otros: ${metadata.otherTransportPackets}")
+    Text("DNS: ${metadata.dnsPackets} · HTTP: ${metadata.httpPackets}")
+    Text("TLS/QUIC: ${metadata.tlsOrQuicPackets}")
+    Text("Destinos únicos: ${metadata.uniqueDestinations}")
+    if (metadata.unparsedPackets > 0) {
+        Text("No interpretados: ${metadata.unparsedPackets}")
     }
 }
 
