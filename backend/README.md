@@ -15,11 +15,17 @@ El comando acepta `start`, `stop`, `restart` y `status`. Por ejemplo:
 .\backend\.venv\Scripts\python.exe .\backend\local_services.py stop
 ```
 
-Los procesos se ejecutan sin ventanas adicionales. PostgreSQL continúa limitado a
+Los procesos se ejecutan sin ventanas adicionales. El estado muestra por separado
+`Backend activo` y `SOCKS5 activo`. PostgreSQL continúa limitado a
 127.0.0.1:55432. FastAPI escucha en el puerto 8001 de la PC para permitir pruebas
 desde el emulador y desde un teléfono conectado a la misma red privada. El emulador
 usa 10.0.2.2 y el teléfono usa la dirección configurada como `LOCAL_BACKEND_HOST`
 en `app/build.gradle.kts`. Esta conexión HTTP solo está habilitada en compilaciones debug.
+
+El relé SOCKS5 de desarrollo escucha únicamente en `127.0.0.1:1080`; el emulador
+puede alcanzarlo mediante `10.0.2.2:1080`. En esta etapa admite conexiones TCP y
+no almacena el contenido reenviado. Todavía falta conectar el túnel VPN de Android
+al relé, por lo que su presencia no significa que la captura completa esté activa.
 
 Para habilitar el acceso del teléfono, abrir PowerShell como administrador y ejecutar:
 
