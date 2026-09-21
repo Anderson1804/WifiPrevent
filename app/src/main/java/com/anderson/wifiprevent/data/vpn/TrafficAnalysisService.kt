@@ -12,6 +12,8 @@ import android.os.ParcelFileDescriptor
 import com.anderson.wifiprevent.MainActivity
 import com.anderson.wifiprevent.data.local.AnalysisSessionStore
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataAccumulator
+import com.anderson.wifiprevent.domain.traffic.CaptureMode
+import com.anderson.wifiprevent.domain.traffic.VpnCapturePlans
 import java.io.FileInputStream
 import java.io.IOException
 import java.net.InetAddress
@@ -26,6 +28,7 @@ class TrafficAnalysisService : VpnService() {
     private var readerThread: Thread? = null
     @Volatile private var capturing = false
     private var accumulator = TrafficMetadataAccumulator()
+    private val packetForwarder: PacketForwarder = PendingPacketForwarder()
 
     override fun onCreate() {
         super.onCreate()
@@ -53,7 +56,7 @@ class TrafficAnalysisService : VpnService() {
                     ?: return START_NOT_STICKY
                 sessionStore.start(sessionId, networkName, securityType)
                 startAsForeground(networkName)
-                if (!startControlledCapture()) {
+                if (!startCapture(CaptureMode.CONTROLLED)) {
                     sessionStore.fail()
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
@@ -76,22 +79,30 @@ class TrafficAnalysisService : VpnService() {
         super.onDestroy()
     }
 
-    private fun startControlledCapture(): Boolean = runCatching {
+    private fun startCapture(mode: CaptureMode): Boolean = runCatching {
         stopControlledCapture()
+        val plan = VpnCapturePlans.forMode(mode)
+        if (plan.requiresPacketForwarder && !packetForwarder.available) return false
         accumulator = TrafficMetadataAccumulator()
-        val established = Builder()
-            .setSession("WiFiPrevent - validación controlada")
+        val builder = Builder()
+            .setSession(plan.sessionName)
             .setMtu(1500)
-            .addAddress(TUN_ADDRESS, 32)
-            .addRoute(TEST_NETWORK, 24)
+            .addAddress(plan.ipv4Address, plan.ipv4PrefixLength)
             .setBlocking(true)
-            .establish() ?: return false
+        plan.routes.forEach { route -> builder.addRoute(route.address, route.prefixLength) }
+        val established = builder.establish() ?: return false
         tunnel = established
         capturing = true
-        readerThread = Thread({ readPackets(established) }, "wifiprevent-tun-reader").apply {
-            start()
+        if (plan.requiresPacketForwarder) {
+            if (!packetForwarder.start(established, ::recordPacket)) return false
+        } else {
+            readerThread = Thread({ readPackets(established) }, "wifiprevent-tun-reader").apply {
+                start()
+            }
         }
-        Thread({ generateControlledPackets() }, "wifiprevent-test-traffic").start()
+        if (plan.generateValidationTraffic) {
+            Thread({ generateControlledPackets() }, "wifiprevent-test-traffic").start()
+        }
         true
     }.getOrDefault(false)
 
@@ -102,13 +113,17 @@ class TrafficAnalysisService : VpnService() {
                 while (capturing) {
                     val length = input.read(buffer)
                     if (length <= 0) break
-                    accumulator.add(buffer.copyOf(length))
-                    sessionStore.updateMetadata(accumulator.summary())
+                    recordPacket(buffer.copyOf(length))
                 }
             }
         } catch (_: IOException) {
             if (capturing) sessionStore.fail()
         }
+    }
+
+    private fun recordPacket(packet: ByteArray) {
+        accumulator.add(packet)
+        sessionStore.updateMetadata(accumulator.summary())
     }
 
     private fun generateControlledPackets() {
@@ -139,6 +154,7 @@ class TrafficAnalysisService : VpnService() {
         tunnel = null
         readerThread?.interrupt()
         readerThread = null
+        packetForwarder.stop()
     }
 
     private fun startAsForeground(networkName: String?) {
@@ -217,7 +233,6 @@ class TrafficAnalysisService : VpnService() {
 
         private const val CHANNEL_ID = "traffic_analysis"
         private const val NOTIFICATION_ID = 2001
-        private const val TEST_NETWORK = "203.0.113.0"
         private const val TUN_ADDRESS = "10.77.0.2"
     }
 }
