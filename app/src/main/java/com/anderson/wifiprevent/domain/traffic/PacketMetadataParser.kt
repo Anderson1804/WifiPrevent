@@ -38,8 +38,42 @@ object PacketMetadataParser {
         val payloadBytes = packet.u16(4)
         val totalBytes = IPV6_HEADER + payloadBytes
         if (totalBytes > packet.size) return null
-        val protocolNumber = packet[6].unsigned()
-        val ports = parsePorts(packet, IPV6_HEADER, totalBytes, protocolNumber)
+        var protocolNumber = packet[6].unsigned()
+        var transportOffset = IPV6_HEADER
+        var firstFragment = true
+        var extensionCount = 0
+        while (protocolNumber in IPV6_EXTENSION_HEADERS) {
+            if (++extensionCount > MAX_EXTENSION_HEADERS) return null
+            when (protocolNumber) {
+                0, 43, 60 -> {
+                    if (transportOffset + 2 > totalBytes) return null
+                    val next = packet[transportOffset].unsigned()
+                    val length = (packet[transportOffset + 1].unsigned() + 1) * 8
+                    if (length < 8 || transportOffset + length > totalBytes) return null
+                    protocolNumber = next
+                    transportOffset += length
+                }
+                44 -> {
+                    if (transportOffset + 8 > totalBytes) return null
+                    val next = packet[transportOffset].unsigned()
+                    val fragmentField = packet.u16(transportOffset + 2)
+                    firstFragment = fragmentField and 0xFFF8 == 0
+                    protocolNumber = next
+                    transportOffset += 8
+                }
+                51 -> {
+                    if (transportOffset + 2 > totalBytes) return null
+                    val next = packet[transportOffset].unsigned()
+                    val length = (packet[transportOffset + 1].unsigned() + 2) * 4
+                    if (length < 8 || transportOffset + length > totalBytes) return null
+                    protocolNumber = next
+                    transportOffset += length
+                }
+            }
+        }
+        val ports = if (firstFragment) {
+            parsePorts(packet, transportOffset, totalBytes, protocolNumber)
+        } else null
         return metadata(
             ipVersion = 6,
             protocolNumber = protocolNumber,
@@ -112,4 +146,6 @@ object PacketMetadataParser {
 
     private const val IPV4_MIN_HEADER = 20
     private const val IPV6_HEADER = 40
+    private const val MAX_EXTENSION_HEADERS = 8
+    private val IPV6_EXTENSION_HEADERS = setOf(0, 43, 44, 51, 60)
 }

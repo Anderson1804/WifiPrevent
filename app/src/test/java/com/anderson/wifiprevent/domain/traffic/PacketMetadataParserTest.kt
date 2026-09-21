@@ -43,6 +43,17 @@ class PacketMetadataParserTest {
     }
 
     @Test
+    fun walksIpv6ExtensionHeaderBeforeUdp() {
+        val packet = ipv6Udp(53_000, 53, withDestinationOptions = true)
+
+        val result = PacketMetadataParser.parse(packet)!!
+
+        assertEquals(TransportProtocol.UDP, result.transportProtocol)
+        assertEquals(53, result.destinationPort)
+        assertEquals(ApplicationHint.DNS, result.applicationHint)
+    }
+
+    @Test
     fun fragmentedIpv4PacketDoesNotInventPorts() {
         val packet = ipv4(protocol = 6, sourcePort = 1000, destinationPort = 443)
         packet[7] = 1
@@ -75,17 +86,26 @@ class PacketMetadataParserTest {
         return packet
     }
 
-    private fun ipv6Udp(sourcePort: Int, destinationPort: Int): ByteArray {
-        val packet = ByteArray(48)
+    private fun ipv6Udp(
+        sourcePort: Int,
+        destinationPort: Int,
+        withDestinationOptions: Boolean = false
+    ): ByteArray {
+        val extensionBytes = if (withDestinationOptions) 8 else 0
+        val packet = ByteArray(48 + extensionBytes)
         packet[0] = 0x60
-        packet[5] = 8
-        packet[6] = 17
+        packet[5] = (8 + extensionBytes).toByte()
+        packet[6] = if (withDestinationOptions) 60 else 17
         val source = byteArrayOf(0x20, 0x01, 0x0d, 0xb8.toByte(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
         val destination = source.copyOf().apply { this[15] = 2 }
         source.copyInto(packet, 8)
         destination.copyInto(packet, 24)
-        putU16(packet, 40, sourcePort)
-        putU16(packet, 42, destinationPort)
+        if (withDestinationOptions) {
+            packet[40] = 17
+            packet[41] = 0
+        }
+        putU16(packet, 40 + extensionBytes, sourcePort)
+        putU16(packet, 42 + extensionBytes, destinationPort)
         return packet
     }
 
