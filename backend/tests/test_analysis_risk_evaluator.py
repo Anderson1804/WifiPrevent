@@ -16,7 +16,7 @@ from app.services import evaluate_analysis_risk
 def test_analysis_uses_security_when_sample_is_sufficient(security_type, expected):
     result = evaluate_analysis_risk(security_type, 20, 100, 20)
     assert result.level == expected
-    assert "todavía no clasifica" in result.reasons[-1]
+    assert "muestra controlada" in result.reasons[-1]
 
 
 @pytest.mark.parametrize(

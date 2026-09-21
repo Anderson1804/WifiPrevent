@@ -13,6 +13,18 @@ def reading(session_id=None):
         "transmitted_bytes": 5816,
         "received_packets": 238,
         "transmitted_packets": 42,
+        "parsed_packets": 3,
+        "unparsed_packets": 0,
+        "ipv4_packets": 3,
+        "ipv6_packets": 0,
+        "tcp_packets": 0,
+        "udp_packets": 3,
+        "icmp_packets": 0,
+        "other_transport_packets": 0,
+        "dns_packets": 1,
+        "http_packets": 0,
+        "tls_or_quic_packets": 1,
+        "unique_destinations": 3,
     }
 
 
@@ -67,6 +79,7 @@ def test_analysis_sessions_are_isolated(client, headers):
         {"duration_seconds": 86_401},
         {"received_bytes": -1},
         {"transmitted_packets": -1},
+        {"parsed_packets": -1},
         {"extra": "unexpected"},
     ],
 )
