@@ -84,7 +84,7 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
             return
 
         await send_reply(writer, 0, upstream_writer.get_extra_info("sockname"))
-        LOGGER.info("Conexión TCP reenviada a %s:%d", host, port)
+        LOGGER.info("Conexión TCP reenviada")
         tasks = {
             asyncio.create_task(copy_stream(reader, upstream_writer)),
             asyncio.create_task(copy_stream(upstream_reader, writer)),
