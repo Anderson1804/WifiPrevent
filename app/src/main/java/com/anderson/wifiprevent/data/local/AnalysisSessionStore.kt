@@ -10,8 +10,10 @@ import kotlin.math.max
 data class StoredAnalysisSession(
     val id: String,
     val ssid: String?,
+    val securityType: String?,
     val state: AnalysisSessionState,
-    val metrics: TrafficMetrics
+    val metrics: TrafficMetrics,
+    val uploaded: Boolean
 )
 
 class AnalysisSessionStore(context: Context) {
@@ -20,10 +22,11 @@ class AnalysisSessionStore(context: Context) {
         Context.MODE_PRIVATE
     )
 
-    fun start(sessionId: String, ssid: String?) {
+    fun start(sessionId: String, ssid: String?, securityType: String?) {
         preferences.edit()
             .putString("session_id", sessionId)
             .putString("ssid", ssid)
+            .putString("security_type", securityType)
             .putString("state", AnalysisSessionState.ANALYZING.name)
             .putLong("started_at", SystemClock.elapsedRealtime())
             .putLong("base_rx_bytes", counter(TrafficStats.getTotalRxBytes()))
@@ -35,6 +38,7 @@ class AnalysisSessionStore(context: Context) {
             .remove("final_tx_bytes")
             .remove("final_rx_packets")
             .remove("final_tx_packets")
+            .putBoolean("uploaded", false)
             .commit()
     }
 
@@ -53,6 +57,12 @@ class AnalysisSessionStore(context: Context) {
 
     fun clear() {
         preferences.edit().clear().commit()
+    }
+
+    fun markUploaded(sessionId: String) {
+        if (preferences.getString("session_id", null) == sessionId) {
+            preferences.edit().putBoolean("uploaded", true).commit()
+        }
     }
 
     fun snapshot(): StoredAnalysisSession? {
@@ -76,8 +86,10 @@ class AnalysisSessionStore(context: Context) {
         return StoredAnalysisSession(
             id,
             preferences.getString("ssid", null),
+            preferences.getString("security_type", null),
             state,
-            metrics
+            metrics,
+            preferences.getBoolean("uploaded", false)
         )
     }
 
