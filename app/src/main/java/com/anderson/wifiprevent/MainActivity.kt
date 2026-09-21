@@ -28,6 +28,8 @@ import androidx.lifecycle.lifecycleScope
 import com.anderson.wifiprevent.data.network.WifiConnectionObserver
 import com.anderson.wifiprevent.data.local.AnalysisSessionStore
 import com.anderson.wifiprevent.data.vpn.TrafficAnalysisService
+import com.anderson.wifiprevent.data.vpn.SocksRelayProbe
+import com.anderson.wifiprevent.data.vpn.SocksRelayStatus
 import com.anderson.wifiprevent.domain.model.AnalysisSession
 import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.HistoryEntry
@@ -89,6 +91,9 @@ class MainActivity : ComponentActivity() {
     private var analysisUploading by mutableStateOf(false)
     private var analysisUploadMessage by mutableStateOf<String?>(null)
     private var analysisUploadError by mutableStateOf(false)
+    private var relayStatus by mutableStateOf<SocksRelayStatus?>(null)
+    private var checkingRelay by mutableStateOf(false)
+    private val socksRelayProbe = SocksRelayProbe()
 
     private val connectionRepository by lazy {
         ConnectionRepository(
@@ -196,11 +201,14 @@ class MainActivity : ComponentActivity() {
                             uploadMessage = analysisUploadMessage,
                             uploadError = analysisUploadError,
                             uploading = analysisUploading,
+                            relayStatus = relayStatus,
+                            checkingRelay = checkingRelay,
                             onBack = { currentScreen = AppScreen.CONNECTION },
                             onPrepare = { prepareAnalysisSession() },
                             onStart = { beginAnalysisAuthorization() },
                             onStop = { stopAnalysisService() },
                             onRetryUpload = { uploadCompletedAnalysis() },
+                            onCheckRelay = { checkSocksRelay() },
                             modifier = Modifier.padding(padding)
                         )
 
@@ -365,6 +373,15 @@ class MainActivity : ComponentActivity() {
             state = AnalysisSessionState.READY,
             ssid = connection?.ssid
         )
+    }
+
+    private fun checkSocksRelay() {
+        if (checkingRelay) return
+        checkingRelay = true
+        lifecycleScope.launch {
+            relayStatus = socksRelayProbe.check()
+            checkingRelay = false
+        }
     }
 
     private fun beginAnalysisAuthorization() {
