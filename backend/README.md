@@ -29,6 +29,9 @@ permite comprobar la negociación SOCKS5 desde el emulador. El relé acepta TCP 
 `UDP ASSOCIATE`, necesario para reenviar consultas DNS cuando se conecte el motor.
 Todavía falta conectar el túnel VPN de Android
 al relé, por lo que su presencia no significa que la captura completa esté activa.
+La configuración preparada para el futuro motor nativo usa el TUN `10.77.0.2`,
+el relé `10.0.2.2:1080`, UDP directo y registros nativos deshabilitados. El archivo
+se generará en el almacenamiento privado de la aplicación y no contendrá credenciales.
 
 Para habilitar el acceso del teléfono, abrir PowerShell como administrador y ejecutar:
 
