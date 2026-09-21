@@ -38,6 +38,7 @@ fun ConnectionScreen(
     onCheck: () -> Unit,
     onAnalysis: () -> Unit,
     onHistory: () -> Unit,
+    onAnalysisHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -187,6 +188,13 @@ fun ConnectionScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Ver historial")
+        }
+
+        OutlinedButton(
+            onClick = onAnalysisHistory,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Ver análisis guardados")
         }
 
         if (sending) {
