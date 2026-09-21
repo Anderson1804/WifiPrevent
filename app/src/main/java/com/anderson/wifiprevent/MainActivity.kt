@@ -58,6 +58,8 @@ class MainActivity : ComponentActivity() {
             }
             if (snapshot?.state == AnalysisSessionState.ANALYZING) {
                 analysisTimer.postDelayed(this, 1_000)
+            } else if (snapshot?.state == AnalysisSessionState.COMPLETED) {
+                uploadCompletedAnalysis()
             }
         }
     }
@@ -74,6 +76,9 @@ class MainActivity : ComponentActivity() {
     private var backendMessage by mutableStateOf<String?>(null)
     private var backendError by mutableStateOf(false)
     private var submission: Job? = null
+    private var analysisUploading by mutableStateOf(false)
+    private var analysisUploadMessage by mutableStateOf<String?>(null)
+    private var analysisUploadError by mutableStateOf(false)
 
     private val connectionRepository by lazy {
         ConnectionRepository(
@@ -160,10 +165,14 @@ class MainActivity : ComponentActivity() {
                             wifi = connection,
                             session = analysisSession,
                             metrics = analysisMetrics,
+                            uploadMessage = analysisUploadMessage,
+                            uploadError = analysisUploadError,
+                            uploading = analysisUploading,
                             onBack = { currentScreen = AppScreen.CONNECTION },
                             onPrepare = { prepareAnalysisSession() },
                             onStart = { beginAnalysisAuthorization() },
                             onStop = { stopAnalysisService() },
+                            onRetryUpload = { uploadCompletedAnalysis() },
                             modifier = Modifier.padding(padding)
                         )
 
@@ -284,6 +293,8 @@ class MainActivity : ComponentActivity() {
         analysisTimer.removeCallbacks(analysisTick)
         analysisSessionStore.clear()
         analysisMetrics = TrafficMetrics.EMPTY
+        analysisUploadMessage = null
+        analysisUploadError = false
         analysisSession = AnalysisSession(
             state = AnalysisSessionState.READY,
             ssid = connection?.ssid
@@ -330,6 +341,10 @@ class MainActivity : ComponentActivity() {
                 TrafficAnalysisService.EXTRA_SESSION_ID,
                 analysisSession?.id
             )
+            putExtra(
+                TrafficAnalysisService.EXTRA_SECURITY_TYPE,
+                connection?.securityType
+            )
         }
         ContextCompat.startForegroundService(this, intent)
 
@@ -359,6 +374,12 @@ class MainActivity : ComponentActivity() {
         analysisMetrics = snapshot.metrics
         if (snapshot.state == AnalysisSessionState.ANALYZING) {
             analysisTimer.post(analysisTick)
+        } else if (snapshot.state == AnalysisSessionState.COMPLETED) {
+            if (snapshot.uploaded) {
+                analysisUploadMessage = "Sesión guardada en el servidor local."
+            } else {
+                uploadCompletedAnalysis()
+            }
         }
     }
 
@@ -372,6 +393,42 @@ class MainActivity : ComponentActivity() {
             if (snapshot.state == AnalysisSessionState.ANALYZING) {
                 analysisTimer.removeCallbacks(analysisTick)
                 analysisTimer.post(analysisTick)
+            } else if (snapshot.state == AnalysisSessionState.COMPLETED) {
+                if (snapshot.uploaded) {
+                    analysisUploadMessage = "Sesión guardada en el servidor local."
+                    analysisUploadError = false
+                } else {
+                    uploadCompletedAnalysis()
+                }
+            }
+        }
+    }
+
+    private fun uploadCompletedAnalysis() {
+        val stored = analysisSessionStore.snapshot() ?: return
+        if (
+            stored.state != AnalysisSessionState.COMPLETED ||
+            stored.uploaded ||
+            analysisUploading
+        ) return
+
+        analysisUploading = true
+        analysisUploadError = false
+        analysisUploadMessage = "Guardando la sesión en el servidor local…"
+        lifecycleScope.launch {
+            try {
+                val receipt = connectionRepository.saveAnalysis(stored)
+                analysisSessionStore.markUploaded(receipt.sessionId)
+                analysisUploadMessage = receipt.message
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                analysisUploadError = true
+                analysisUploadMessage =
+                    "La sesión quedó guardada en el teléfono, pero aún no llegó al servidor. " +
+                            (e.message ?: "Puedes reintentar el envío.")
+            } finally {
+                analysisUploading = false
             }
         }
     }
