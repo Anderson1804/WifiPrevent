@@ -1,7 +1,7 @@
 from alembic import context
 
 from app.db.session import Base, engine
-from app.db.models.connection_check import ConnectionCheck
+from app.db.models import AnalysisSessionRecord, ConnectionCheck
 
 def run_migrations() -> None:
     with engine.connect() as connection:
