@@ -15,6 +15,7 @@ from app.schemas.analysis_session import (
     AnalysisSessionReading,
     AnalysisSessionReceipt,
 )
+from app.services import evaluate_analysis_risk
 
 
 router = APIRouter(prefix="/api/v1/analysis-sessions", tags=["analysis-sessions"])
@@ -27,9 +28,23 @@ def save_analysis_session(
         owner: OwnerHash,
 ) -> AnalysisSessionReceipt:
     values = reading.model_dump()
+    assessment = evaluate_analysis_risk(
+        security_type=reading.security_type,
+        duration_seconds=reading.duration_seconds,
+        received_packets=reading.received_packets,
+        transmitted_packets=reading.transmitted_packets,
+    )
     statement = (
         insert(AnalysisSessionRecord)
-        .values(owner_hash=owner, received_at=datetime.now(timezone.utc), **values)
+        .values(
+            owner_hash=owner,
+            received_at=datetime.now(timezone.utc),
+            **values,
+            risk_level=assessment.level,
+            risk_reasons=list(assessment.reasons),
+            assessment_scope="connection_metadata",
+            traffic_analysis_performed=False,
+        )
         .on_conflict_do_nothing(index_elements=[AnalysisSessionRecord.session_id])
     )
     session.execute(statement)
@@ -51,7 +66,14 @@ def save_analysis_session(
         )
 
     session.commit()
-    return AnalysisSessionReceipt(session_id=row.session_id, received_at=row.received_at)
+    return AnalysisSessionReceipt(
+        session_id=row.session_id,
+        received_at=row.received_at,
+        risk_level=row.risk_level,
+        risk_reasons=row.risk_reasons,
+        assessment_scope=row.assessment_scope,
+        traffic_analysis_performed=row.traffic_analysis_performed,
+    )
 
 
 @router.get("", response_model=AnalysisSessionPage)
