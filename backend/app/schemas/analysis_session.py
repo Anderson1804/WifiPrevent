@@ -23,6 +23,10 @@ class AnalysisSessionReceipt(BaseModel):
     session_id: UUID
     received_at: datetime
     status: Literal["completed"] = "completed"
+    risk_level: Literal["low", "medium", "high", "unknown"]
+    risk_reasons: list[str]
+    assessment_scope: Literal["connection_metadata"] = "connection_metadata"
+    traffic_analysis_performed: bool = False
     message: str = "La sesión de análisis se guardó correctamente."
 
 
@@ -38,6 +42,10 @@ class AnalysisSessionItem(BaseModel):
     transmitted_bytes: int
     received_packets: int
     transmitted_packets: int
+    risk_level: Literal["low", "medium", "high", "unknown"] | None = None
+    risk_reasons: list[str] | None = None
+    assessment_scope: Literal["connection_metadata"] | None = None
+    traffic_analysis_performed: bool = False
 
 
 class AnalysisSessionPage(BaseModel):
