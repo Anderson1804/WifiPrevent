@@ -96,6 +96,13 @@ private fun AnalysisHistoryCard(entry: AnalysisHistoryEntry) {
                 fontWeight = FontWeight.Bold
             )
             entry.riskReasons.forEach { reason -> Text("• $reason") }
+            if (entry.indicators.isNotEmpty()) {
+                Text("Observaciones técnicas", fontWeight = FontWeight.Bold)
+                entry.indicators.forEach { indicator ->
+                    Text("${indicatorLabel(indicator.severity)} ${indicator.title}")
+                    Text(indicator.description, style = MaterialTheme.typography.bodySmall)
+                }
+            }
             if (!entry.trafficAnalysisPerformed) {
                 Text(
                     "Alcance actual: metadatos de conexión y una muestra controlada de " +
@@ -147,3 +154,9 @@ private fun formatAnalysisDate(value: String): String = runCatching {
     OffsetDateTime.parse(value).atZoneSameInstant(ZoneId.systemDefault())
         .format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm:ss", Locale.forLanguageTag("es")))
 }.getOrDefault(value)
+
+private fun indicatorLabel(severity: String): String = when (severity) {
+    "warning" -> "Advertencia:"
+    "medium" -> "Atención:"
+    else -> "Información:"
+}
