@@ -34,6 +34,7 @@ import com.anderson.wifiprevent.domain.model.HistoryEntry
 import com.anderson.wifiprevent.domain.model.AnalysisHistoryEntry
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
+import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
 import com.anderson.wifiprevent.ui.connection.ConnectionScreen
 import com.anderson.wifiprevent.ui.analysis.AnalysisScreen
 import com.anderson.wifiprevent.ui.analysis.AnalysisHistoryScreen
@@ -50,12 +51,14 @@ class MainActivity : ComponentActivity() {
     private var currentScreen by mutableStateOf(AppScreen.CONNECTION)
     private var analysisSession by mutableStateOf<AnalysisSession?>(null)
     private var analysisMetrics by mutableStateOf(TrafficMetrics.EMPTY)
+    private var analysisMetadata by mutableStateOf(TrafficMetadataSummary.EMPTY)
     private val analysisTimer = Handler(Looper.getMainLooper())
     private val analysisTick = object : Runnable {
         override fun run() {
             val snapshot = analysisSessionStore.snapshot()
             if (snapshot != null && analysisSession?.id == snapshot.id) {
                 analysisMetrics = snapshot.metrics
+                analysisMetadata = snapshot.metadata
                 analysisSession = analysisSession?.copy(state = snapshot.state)
             }
             if (snapshot?.state == AnalysisSessionState.ANALYZING) {
@@ -189,6 +192,7 @@ class MainActivity : ComponentActivity() {
                             wifi = connection,
                             session = analysisSession,
                             metrics = analysisMetrics,
+                            metadata = analysisMetadata,
                             uploadMessage = analysisUploadMessage,
                             uploadError = analysisUploadError,
                             uploading = analysisUploading,
@@ -354,6 +358,7 @@ class MainActivity : ComponentActivity() {
         analysisTimer.removeCallbacks(analysisTick)
         analysisSessionStore.clear()
         analysisMetrics = TrafficMetrics.EMPTY
+        analysisMetadata = TrafficMetadataSummary.EMPTY
         analysisUploadMessage = null
         analysisUploadError = false
         analysisSession = AnalysisSession(
@@ -410,6 +415,7 @@ class MainActivity : ComponentActivity() {
         ContextCompat.startForegroundService(this, intent)
 
         analysisMetrics = TrafficMetrics.EMPTY
+        analysisMetadata = TrafficMetadataSummary.EMPTY
         analysisSession = analysisSession?.copy(
             state = AnalysisSessionState.ANALYZING
         )
@@ -433,6 +439,7 @@ class MainActivity : ComponentActivity() {
             ssid = snapshot.ssid
         )
         analysisMetrics = snapshot.metrics
+        analysisMetadata = snapshot.metadata
         if (snapshot.state == AnalysisSessionState.ANALYZING) {
             analysisTimer.post(analysisTick)
         } else if (snapshot.state == AnalysisSessionState.COMPLETED) {
@@ -450,6 +457,7 @@ class MainActivity : ComponentActivity() {
             restoreAnalysisSession()
         } else {
             analysisMetrics = snapshot.metrics
+            analysisMetadata = snapshot.metadata
             analysisSession = analysisSession?.copy(state = snapshot.state)
             if (snapshot.state == AnalysisSessionState.ANALYZING) {
                 analysisTimer.removeCallbacks(analysisTick)
