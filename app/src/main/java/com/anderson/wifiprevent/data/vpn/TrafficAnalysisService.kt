@@ -8,11 +8,22 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
+import android.os.ParcelFileDescriptor
 import com.anderson.wifiprevent.MainActivity
 import com.anderson.wifiprevent.data.local.AnalysisSessionStore
+import com.anderson.wifiprevent.domain.traffic.TrafficMetadataAccumulator
+import java.io.FileInputStream
+import java.io.IOException
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
 
 class TrafficAnalysisService : VpnService() {
     private val sessionStore by lazy { AnalysisSessionStore(this) }
+    private var tunnel: ParcelFileDescriptor? = null
+    private var readerThread: Thread? = null
+    @Volatile private var capturing = false
+    private var accumulator = TrafficMetadataAccumulator()
 
     override fun onCreate() {
         super.onCreate()
@@ -26,6 +37,7 @@ class TrafficAnalysisService : VpnService() {
     ): Int {
         return when (intent?.action) {
             ACTION_STOP -> {
+                stopControlledCapture()
                 sessionStore.complete()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
@@ -39,16 +51,88 @@ class TrafficAnalysisService : VpnService() {
                     ?: return START_NOT_STICKY
                 sessionStore.start(sessionId, networkName, securityType)
                 startAsForeground(networkName)
+                if (!startControlledCapture()) {
+                    sessionStore.fail()
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }
                 START_NOT_STICKY
             }
         }
     }
 
     override fun onRevoke() {
+        stopControlledCapture()
         sessionStore.complete()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         super.onRevoke()
+    }
+
+    override fun onDestroy() {
+        stopControlledCapture()
+        super.onDestroy()
+    }
+
+    private fun startControlledCapture(): Boolean = runCatching {
+        stopControlledCapture()
+        accumulator = TrafficMetadataAccumulator()
+        val established = Builder()
+            .setSession("WiFiPrevent - validación controlada")
+            .setMtu(1500)
+            .addAddress("10.77.0.2", 32)
+            .addRoute(TEST_NETWORK, 24)
+            .setBlocking(true)
+            .establish() ?: return false
+        tunnel = established
+        capturing = true
+        readerThread = Thread({ readPackets(established) }, "wifiprevent-tun-reader").apply {
+            start()
+        }
+        Thread({ generateControlledPackets() }, "wifiprevent-test-traffic").start()
+        true
+    }.getOrDefault(false)
+
+    private fun readPackets(descriptor: ParcelFileDescriptor) {
+        val buffer = ByteArray(32_767)
+        try {
+            FileInputStream(descriptor.fileDescriptor).use { input ->
+                while (capturing) {
+                    val length = input.read(buffer)
+                    if (length <= 0) break
+                    accumulator.add(buffer.copyOf(length))
+                    sessionStore.updateMetadata(accumulator.summary())
+                }
+            }
+        } catch (_: IOException) {
+            if (capturing) sessionStore.fail()
+        }
+    }
+
+    private fun generateControlledPackets() {
+        val probes = listOf(
+            Triple("203.0.113.1", 53, "dns"),
+            Triple("203.0.113.2", 443, "tls"),
+            Triple("203.0.113.3", 9_999, "other")
+        )
+        runCatching {
+            DatagramSocket().use { socket ->
+                probes.forEach { (address, port, label) ->
+                    val payload = "wifiprevent-$label".toByteArray(Charsets.UTF_8)
+                    socket.send(
+                        DatagramPacket(payload, payload.size, InetAddress.getByName(address), port)
+                    )
+                }
+            }
+        }
+    }
+
+    private fun stopControlledCapture() {
+        capturing = false
+        runCatching { tunnel?.close() }
+        tunnel = null
+        readerThread?.interrupt()
+        readerThread = null
     }
 
     private fun startAsForeground(networkName: String?) {
@@ -127,5 +211,6 @@ class TrafficAnalysisService : VpnService() {
 
         private const val CHANNEL_ID = "traffic_analysis"
         private const val NOTIFICATION_ID = 2001
+        private const val TEST_NETWORK = "203.0.113.0"
     }
 }
