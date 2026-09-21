@@ -89,6 +89,15 @@ fun AnalysisScreen(
                     "todavía no identifican aplicaciones ni contenido."
         )
         Text("La validación de protocolos usa una ruta VPN aislada y tráfico de prueba controlado.")
+        Text(
+            "Modo actual: validación controlada",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            "La captura completa permanecerá deshabilitada hasta integrar y verificar " +
+                    "el motor que reenvía los paquetes sin interrumpir Internet."
+        )
 
         if (session == null) {
             Button(
