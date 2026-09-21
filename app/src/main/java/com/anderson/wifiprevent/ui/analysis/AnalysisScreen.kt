@@ -21,6 +21,7 @@ import com.anderson.wifiprevent.domain.model.AnalysisSession
 import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
+import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
 import com.anderson.wifiprevent.ui.common.formatSecurityType
 
 @Composable
@@ -28,6 +29,7 @@ fun AnalysisScreen(
     wifi: WifiSnapshot?,
     session: AnalysisSession?,
     metrics: TrafficMetrics,
+    metadata: TrafficMetadataSummary,
     uploadMessage: String?,
     uploadError: Boolean,
     uploading: Boolean,
@@ -86,13 +88,7 @@ fun AnalysisScreen(
             "Los contadores son agregados del teléfono durante el intervalo; " +
                     "todavía no identifican aplicaciones ni contenido."
         )
-        Text(
-            text = "Previsto para etapas posteriores",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Text("• Protocolos y puertos observados")
-        Text("• Indicadores de conexiones sin cifrar")
+        Text("La validación de protocolos usa una ruta VPN aislada y tráfico de prueba controlado.")
 
         if (session == null) {
             Button(
@@ -128,9 +124,11 @@ fun AnalysisScreen(
                         )
                         AnalysisSessionState.ANALYZING -> {
                             MetricsContent(metrics, final = false)
+                            MetadataContent(metadata)
                         }
                         AnalysisSessionState.COMPLETED -> {
                             MetricsContent(metrics, final = true)
+                            MetadataContent(metadata)
                             Text("La sesión terminó sin almacenar contenido de tráfico.")
                             uploadMessage?.let {
                                 Text(
@@ -195,6 +193,31 @@ private fun MetricsContent(metrics: TrafficMetrics, final: Boolean) {
     Text("Enviado: ${formatBytes(metrics.transmittedBytes)}")
     Text("Paquetes recibidos: ${metrics.receivedPackets}")
     Text("Paquetes enviados: ${metrics.transmittedPackets}")
+}
+
+@Composable
+private fun MetadataContent(metadata: TrafficMetadataSummary) {
+    Text(
+        "Metadatos interpretados",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold
+    )
+    Text("Paquetes válidos: ${metadata.parsedPackets}")
+    Text("IPv4: ${metadata.ipv4Packets} · IPv6: ${metadata.ipv6Packets}")
+    Text("TCP: ${metadata.tcpPackets} · UDP: ${metadata.udpPackets}")
+    Text("ICMP: ${metadata.icmpPackets} · Otros: ${metadata.otherTransportPackets}")
+    Text("DNS: ${metadata.dnsPackets}")
+    Text("HTTP: ${metadata.httpPackets}")
+    Text("TLS/QUIC: ${metadata.tlsOrQuicPackets}")
+    Text("Destinos únicos: ${metadata.uniqueDestinations}")
+    if (metadata.unparsedPackets > 0) {
+        Text("Paquetes no interpretados: ${metadata.unparsedPackets}")
+    }
+    Text(
+        "Estos valores provienen de paquetes controlados de validación; todavía no representan " +
+                "todo el tráfico del emulador.",
+        style = MaterialTheme.typography.bodySmall
+    )
 }
 
 private fun formatBytes(bytes: Long): String = when {
