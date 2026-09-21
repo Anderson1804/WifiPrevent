@@ -494,7 +494,10 @@ class MainActivity : ComponentActivity() {
                     append("Evaluación preliminar: ${formatRiskLevel(receipt.riskLevel, true)}")
                     if (reasons.isNotBlank()) append("\n$reasons")
                     if (!receipt.trafficAnalysisPerformed) {
-                        append("\nEl análisis por protocolos y destinos todavía no está implementado.")
+                        append("\nLa muestra de protocolos es controlada; la captura completa está pendiente.")
+                    }
+                    receipt.indicators.forEach { indicator ->
+                        append("\n${indicator.title}: ${indicator.description}")
                     }
                 }
             } catch (e: CancellationException) {
