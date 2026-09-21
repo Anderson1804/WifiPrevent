@@ -12,7 +12,9 @@ data class AnalysisHistoryEntry(
     val riskLevel: String?,
     val riskReasons: List<String>,
     val assessmentScope: String?,
-    val trafficAnalysisPerformed: Boolean
+    val trafficAnalysisPerformed: Boolean,
+    val captureMode: String,
+    val indicators: List<TrafficIndicator>
 )
 
 data class AnalysisHistoryPage(

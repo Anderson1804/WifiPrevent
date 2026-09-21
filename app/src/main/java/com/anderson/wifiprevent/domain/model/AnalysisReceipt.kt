@@ -6,5 +6,7 @@ data class AnalysisReceipt(
     val riskLevel: String?,
     val riskReasons: List<String>,
     val assessmentScope: String?,
-    val trafficAnalysisPerformed: Boolean
+    val trafficAnalysisPerformed: Boolean,
+    val captureMode: String,
+    val indicators: List<TrafficIndicator>
 )
