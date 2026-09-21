@@ -22,10 +22,16 @@ def test_completed_session_is_saved_and_listed(client, headers):
     assert response.status_code == 200
     assert response.json()["session_id"] == payload["session_id"]
     assert response.json()["status"] == "completed"
+    assert response.json()["risk_level"] == "low"
+    assert response.json()["risk_reasons"]
+    assert response.json()["assessment_scope"] == "connection_metadata"
+    assert response.json()["traffic_analysis_performed"] is False
 
     item = client.get("/api/v1/analysis-sessions", headers=headers).json()["items"][0]
     assert {key: item[key] for key in payload} == payload
     assert item["received_at"].endswith("Z")
+    assert item["risk_level"] == "low"
+    assert item["assessment_scope"] == "connection_metadata"
 
 
 def test_analysis_retry_is_idempotent(client, headers):
