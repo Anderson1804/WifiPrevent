@@ -2,42 +2,12 @@ from uuid import uuid4
 import secrets
 import pytest
 
-
-from alembic import command
-from alembic.config import Config
-from fastapi.testclient import TestClient
-from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from app.db.session import engine, get_session
 from main import app
-from pathlib import Path
-
-BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 VALID = {"ssid": "AndroidWifi", "rssi_dbm": -50, "frequency_mhz": 2447,
          "link_speed_mbps": 1, "internet_validated": True, "captive_portal": False, "security_type": "WPA3_SAE"}
-
-@pytest.fixture(scope="session", autouse=True)
-def migrate():
-    assert engine.url.database == "wifiprevent_test"
-    assert engine.url.database == "wifiprevent_test"
-    command.upgrade(
-        Config(str(BACKEND_ROOT / "alembic.ini")),
-        "head"
-    )
-
-@pytest.fixture()
-def client():
-    assert engine.url.database == "wifiprevent_test"
-    with engine.begin() as c:
-        c.execute(text("TRUNCATE connection_checks"))
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
-
-@pytest.fixture()
-def headers():
-    return {"Authorization": "Bearer " + secrets.token_hex(32), "X-Request-ID": str(uuid4())}
 
 def test_health(client):
     assert client.get("/health").json()["database"] == "postgresql"
