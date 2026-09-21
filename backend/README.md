@@ -25,7 +25,9 @@ en `app/build.gradle.kts`. Esta conexión HTTP solo está habilitada en compilac
 El relé SOCKS5 de desarrollo escucha únicamente en `127.0.0.1:1080`; el emulador
 puede alcanzarlo mediante `10.0.2.2:1080`. En esta etapa admite conexiones TCP y
 no almacena el contenido reenviado ni registra los destinos. La pantalla de análisis
-permite comprobar la negociación SOCKS5 desde el emulador. Todavía falta conectar el túnel VPN de Android
+permite comprobar la negociación SOCKS5 desde el emulador. El relé acepta TCP y
+`UDP ASSOCIATE`, necesario para reenviar consultas DNS cuando se conecte el motor.
+Todavía falta conectar el túnel VPN de Android
 al relé, por lo que su presencia no significa que la captura completa esté activa.
 
 Para habilitar el acceso del teléfono, abrir PowerShell como administrador y ejecutar:
