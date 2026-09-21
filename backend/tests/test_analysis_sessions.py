@@ -38,12 +38,16 @@ def test_completed_session_is_saved_and_listed(client, headers):
     assert response.json()["risk_reasons"]
     assert response.json()["assessment_scope"] == "connection_metadata"
     assert response.json()["traffic_analysis_performed"] is False
+    assert response.json()["capture_mode"] == "controlled"
+    assert response.json()["indicators"][0]["code"] == "controlled_sample"
 
     item = client.get("/api/v1/analysis-sessions", headers=headers).json()["items"][0]
     assert {key: item[key] for key in payload} == payload
     assert item["received_at"].endswith("Z")
     assert item["risk_level"] == "low"
     assert item["assessment_scope"] == "connection_metadata"
+    assert item["capture_mode"] == "controlled"
+    assert item["indicators"]
 
 
 def test_analysis_retry_is_idempotent(client, headers):
