@@ -29,6 +29,14 @@ class AnalysisSessionReading(BaseModel):
     http_packets: int = Field(default=0, ge=0)
     tls_or_quic_packets: int = Field(default=0, ge=0)
     unique_destinations: int = Field(default=0, ge=0)
+    capture_mode: Literal["controlled", "full"] = "controlled"
+
+
+class TrafficIndicatorSchema(BaseModel):
+    code: str
+    severity: Literal["info", "warning", "medium"]
+    title: str
+    description: str
 
 
 class AnalysisSessionReceipt(BaseModel):
@@ -39,6 +47,8 @@ class AnalysisSessionReceipt(BaseModel):
     risk_reasons: list[str]
     assessment_scope: Literal["connection_metadata"] = "connection_metadata"
     traffic_analysis_performed: bool = False
+    capture_mode: Literal["controlled", "full"]
+    indicators: list[TrafficIndicatorSchema]
     message: str = "La sesión de análisis se guardó correctamente."
 
 
@@ -70,6 +80,8 @@ class AnalysisSessionItem(BaseModel):
     risk_reasons: list[str] | None = None
     assessment_scope: Literal["connection_metadata"] | None = None
     traffic_analysis_performed: bool = False
+    capture_mode: Literal["controlled", "full"] = "controlled"
+    indicators: list[TrafficIndicatorSchema] = Field(default_factory=list)
 
 
 class AnalysisSessionPage(BaseModel):
