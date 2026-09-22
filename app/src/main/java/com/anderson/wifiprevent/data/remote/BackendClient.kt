@@ -160,7 +160,7 @@ class BackendClient(context: Context) {
                 put("http_packets", session.metadata.httpPackets)
                 put("tls_or_quic_packets", session.metadata.tlsOrQuicPackets)
                 put("unique_destinations", session.metadata.uniqueDestinations)
-                put("capture_mode", "controlled")
+                put("capture_mode", session.captureMode.apiValue)
             }.toString()
             val reply = request("POST", "/api/v1/analysis-sessions", payload)
             require(reply.getString("status") == "completed") {
