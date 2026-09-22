@@ -29,7 +29,9 @@ permite comprobar la negociación SOCKS5 desde el emulador. El relé acepta TCP 
 `UDP ASSOCIATE`, necesario para reenviar consultas DNS cuando se conecte el motor.
 Todavía falta conectar el túnel VPN de Android
 al relé, por lo que su presencia no significa que la captura completa esté activa.
-La configuración preparada para el futuro motor nativo usa el TUN `10.77.0.2`,
+La aplicación incluye hev-socks5-tunnel 2.17.1 para `x86_64` y `arm64-v8a`.
+La comprobación de transporte valida tanto la negociación con el relé como la carga
+JNI del motor. La configuración preparada usa el TUN `10.77.0.2`,
 el relé `10.0.2.2:1080`, UDP directo y registros nativos deshabilitados. El archivo
 se generará en el almacenamiento privado de la aplicación y no contendrá credenciales.
 
