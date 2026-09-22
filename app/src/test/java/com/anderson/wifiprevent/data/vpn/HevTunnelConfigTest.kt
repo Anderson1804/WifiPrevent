@@ -11,7 +11,7 @@ class HevTunnelConfigTest {
         val content = HevTunnelConfig().serialize()
 
         assertTrue(content.contains("ipv4: '10.77.0.2'"))
-        assertTrue(content.contains("ipv6: 'fd00:77::2'"))
+        assertFalse(content.contains("ipv6:"))
         assertTrue(content.contains("address: '10.0.2.2'"))
         assertTrue(content.contains("port: 1080"))
         assertTrue(content.contains("udp: 'udp'"))

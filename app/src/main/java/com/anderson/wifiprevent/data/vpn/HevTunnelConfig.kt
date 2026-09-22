@@ -4,7 +4,6 @@ import java.io.File
 
 data class HevTunnelConfig(
     val tunnelIpv4: String = "10.77.0.2",
-    val tunnelIpv6: String = "fd00:77::2",
     val mtu: Int = 1500,
     val socksHost: String = SocksRelayProbe.EMULATOR_HOST,
     val socksPort: Int = SocksRelayProbe.DEFAULT_PORT
@@ -19,7 +18,6 @@ data class HevTunnelConfig(
         tunnel:
           mtu: $mtu
           ipv4: '$tunnelIpv4'
-          ipv6: '$tunnelIpv6'
           icmp: 'reply'
         socks5:
           address: '$socksHost'
