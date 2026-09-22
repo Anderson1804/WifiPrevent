@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.VpnService
+import android.net.IpPrefix
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import com.anderson.wifiprevent.MainActivity
@@ -56,9 +57,12 @@ class TrafficAnalysisService : VpnService() {
                 val securityType = intent?.getStringExtra(EXTRA_SECURITY_TYPE)
                 val sessionId = intent?.getStringExtra(EXTRA_SESSION_ID)
                     ?: return START_NOT_STICKY
-                sessionStore.start(sessionId, networkName, securityType)
+                val mode = intent.getStringExtra(EXTRA_CAPTURE_MODE)
+                    ?.let { value -> CaptureMode.entries.firstOrNull { it.apiValue == value } }
+                    ?: CaptureMode.CONTROLLED
+                sessionStore.start(sessionId, networkName, securityType, mode)
                 startAsForeground(networkName)
-                if (!startCapture(CaptureMode.CONTROLLED)) {
+                if (!startCapture(mode)) {
                     sessionStore.fail()
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
@@ -77,8 +81,18 @@ class TrafficAnalysisService : VpnService() {
     }
 
     override fun onDestroy() {
+        val wasCapturing = capturing
         stopControlledCapture()
+        if (wasCapturing) sessionStore.complete()
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        stopControlledCapture()
+        sessionStore.complete()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
     }
 
     private fun startCapture(mode: CaptureMode): Boolean = runCatching {
@@ -92,11 +106,22 @@ class TrafficAnalysisService : VpnService() {
             .addAddress(plan.ipv4Address, plan.ipv4PrefixLength)
             .setBlocking(true)
         plan.routes.forEach { route -> builder.addRoute(route.address, route.prefixLength) }
+        if (mode == CaptureMode.FULL) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
+            builder
+                .addDnsServer(FULL_DNS)
+                .excludeRoute(
+                    IpPrefix(InetAddress.getByName(SocksRelayProbe.EMULATOR_HOST), 32)
+                )
+        }
         val established = builder.establish() ?: return false
         tunnel = established
         capturing = true
         if (plan.requiresPacketForwarder) {
-            if (!packetForwarder.start(established, ::recordPacket)) return false
+            if (!packetForwarder.start(established, ::recordPacket)) {
+                stopControlledCapture()
+                return false
+            }
         } else {
             readerThread = Thread({ readPackets(established) }, "wifiprevent-tun-reader").apply {
                 start()
@@ -232,9 +257,11 @@ class TrafficAnalysisService : VpnService() {
         const val EXTRA_NETWORK_NAME = "network_name"
         const val EXTRA_SESSION_ID = "session_id"
         const val EXTRA_SECURITY_TYPE = "security_type"
+        const val EXTRA_CAPTURE_MODE = "capture_mode"
 
         private const val CHANNEL_ID = "traffic_analysis"
         private const val NOTIFICATION_ID = 2001
         private const val TUN_ADDRESS = "10.77.0.2"
+        private const val FULL_DNS = "1.1.1.1"
     }
 }
