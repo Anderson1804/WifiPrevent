@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
+import hev.htproxy.TProxyService
 
 data class SocksRelayStatus(
     val available: Boolean,
@@ -29,14 +30,19 @@ class SocksRelayProbe(
                     throw IOException("Respuesta SOCKS5 no compatible")
                 }
             }
+            TProxyService.TProxyIsRunning()
             SocksRelayStatus(
                 available = true,
-                message = "Relé SOCKS5 disponible en la PC."
+                message = "Relé SOCKS5 y motor nativo disponibles."
             )
         }.getOrElse {
             SocksRelayStatus(
                 available = false,
-                message = "Relé SOCKS5 no disponible. Reinicia los servicios locales de la PC."
+                message = if (it is UnsatisfiedLinkError) {
+                    "El relé responde, pero el motor nativo no pudo cargarse."
+                } else {
+                    "Relé SOCKS5 no disponible. Reinicia los servicios locales de la PC."
+                }
             )
         }
     }

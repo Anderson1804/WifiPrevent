@@ -114,7 +114,7 @@ fun AnalysisScreen(
                 )
                 Text(
                     relayStatus?.message
-                        ?: "Comprueba si el relé SOCKS5 de la PC responde al emulador.",
+                        ?: "Comprueba el relé SOCKS5 y el motor nativo del túnel.",
                     color = if (relayStatus?.available == false) {
                         MaterialTheme.colorScheme.error
                     } else {
@@ -130,7 +130,7 @@ fun AnalysisScreen(
                     enabled = !checkingRelay,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(if (checkingRelay) "Comprobando…" else "Comprobar relé local")
+                    Text(if (checkingRelay) "Comprobando…" else "Comprobar transporte local")
                 }
             }
         }

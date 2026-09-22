@@ -28,7 +28,9 @@ class TrafficAnalysisService : VpnService() {
     private var readerThread: Thread? = null
     @Volatile private var capturing = false
     private var accumulator = TrafficMetadataAccumulator()
-    private val packetForwarder: PacketForwarder = PendingPacketForwarder()
+    private val packetForwarder: PacketForwarder by lazy {
+        HevPacketForwarder(applicationContext)
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -150,11 +152,11 @@ class TrafficAnalysisService : VpnService() {
 
     private fun stopControlledCapture() {
         capturing = false
+        packetForwarder.stop()
         runCatching { tunnel?.close() }
         tunnel = null
         readerThread?.interrupt()
         readerThread = null
-        packetForwarder.stop()
     }
 
     private fun startAsForeground(networkName: String?) {
