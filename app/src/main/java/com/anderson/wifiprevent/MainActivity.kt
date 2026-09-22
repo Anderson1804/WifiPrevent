@@ -37,6 +37,7 @@ import com.anderson.wifiprevent.domain.model.AnalysisHistoryEntry
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
+import com.anderson.wifiprevent.domain.traffic.CaptureMode
 import com.anderson.wifiprevent.ui.connection.ConnectionScreen
 import com.anderson.wifiprevent.ui.analysis.AnalysisScreen
 import com.anderson.wifiprevent.ui.analysis.AnalysisHistoryScreen
@@ -61,7 +62,10 @@ class MainActivity : ComponentActivity() {
             if (snapshot != null && analysisSession?.id == snapshot.id) {
                 analysisMetrics = snapshot.metrics
                 analysisMetadata = snapshot.metadata
-                analysisSession = analysisSession?.copy(state = snapshot.state)
+                analysisSession = analysisSession?.copy(
+                    state = snapshot.state,
+                    captureMode = snapshot.captureMode
+                )
             }
             if (snapshot?.state == AnalysisSessionState.ANALYZING) {
                 analysisTimer.postDelayed(this, 1_000)
@@ -203,9 +207,16 @@ class MainActivity : ComponentActivity() {
                             uploading = analysisUploading,
                             relayStatus = relayStatus,
                             checkingRelay = checkingRelay,
+                            fullModeSupported =
+                                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
                             onBack = { currentScreen = AppScreen.CONNECTION },
                             onPrepare = { prepareAnalysisSession() },
-                            onStart = { beginAnalysisAuthorization() },
+                            onStartControlled = {
+                                beginAnalysisAuthorization(CaptureMode.CONTROLLED)
+                            },
+                            onStartFull = {
+                                beginAnalysisAuthorization(CaptureMode.FULL)
+                            },
                             onStop = { stopAnalysisService() },
                             onRetryUpload = { uploadCompletedAnalysis() },
                             onCheckRelay = { checkSocksRelay() },
@@ -384,9 +395,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun beginAnalysisAuthorization() {
+    private fun beginAnalysisAuthorization(mode: CaptureMode) {
         analysisSession = analysisSession?.copy(
-            state = AnalysisSessionState.PREPARING
+            state = AnalysisSessionState.PREPARING,
+            captureMode = mode
         )
 
         if (
@@ -428,6 +440,10 @@ class MainActivity : ComponentActivity() {
                 TrafficAnalysisService.EXTRA_SECURITY_TYPE,
                 connection?.securityType
             )
+            putExtra(
+                TrafficAnalysisService.EXTRA_CAPTURE_MODE,
+                analysisSession?.captureMode?.apiValue
+            )
         }
         ContextCompat.startForegroundService(this, intent)
 
@@ -453,7 +469,8 @@ class MainActivity : ComponentActivity() {
         analysisSession = AnalysisSession(
             id = snapshot.id,
             state = snapshot.state,
-            ssid = snapshot.ssid
+            ssid = snapshot.ssid,
+            captureMode = snapshot.captureMode
         )
         analysisMetrics = snapshot.metrics
         analysisMetadata = snapshot.metadata
@@ -475,7 +492,10 @@ class MainActivity : ComponentActivity() {
         } else {
             analysisMetrics = snapshot.metrics
             analysisMetadata = snapshot.metadata
-            analysisSession = analysisSession?.copy(state = snapshot.state)
+            analysisSession = analysisSession?.copy(
+                state = snapshot.state,
+                captureMode = snapshot.captureMode
+            )
             if (snapshot.state == AnalysisSessionState.ANALYZING) {
                 analysisTimer.removeCallbacks(analysisTick)
                 analysisTimer.post(analysisTick)

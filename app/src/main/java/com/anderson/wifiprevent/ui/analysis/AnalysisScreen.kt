@@ -23,6 +23,7 @@ import com.anderson.wifiprevent.domain.model.WifiSnapshot
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
 import com.anderson.wifiprevent.data.vpn.SocksRelayStatus
+import com.anderson.wifiprevent.domain.traffic.CaptureMode
 import com.anderson.wifiprevent.ui.common.formatSecurityType
 
 @Composable
@@ -36,9 +37,11 @@ fun AnalysisScreen(
     uploading: Boolean,
     relayStatus: SocksRelayStatus?,
     checkingRelay: Boolean,
+    fullModeSupported: Boolean,
     onBack: () -> Unit,
     onPrepare: () -> Unit,
-    onStart: () -> Unit,
+    onStartControlled: () -> Unit,
+    onStartFull: () -> Unit,
     onStop: () -> Unit,
     onRetryUpload: () -> Unit,
     onCheckRelay: () -> Unit,
@@ -99,8 +102,8 @@ fun AnalysisScreen(
             fontWeight = FontWeight.Bold
         )
         Text(
-            "La captura completa permanecerá deshabilitada hasta integrar y verificar " +
-                    "el motor que reenvía los paquetes sin interrumpir Internet."
+            "La captura completa experimental reenvía IPv4 mediante el relé local. " +
+                    "IPv6 permanece fuera del túnel durante esta etapa."
         )
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
@@ -169,11 +172,11 @@ fun AnalysisScreen(
                         )
                         AnalysisSessionState.ANALYZING -> {
                             MetricsContent(metrics, final = false)
-                            MetadataContent(metadata)
+                            MetadataContent(metadata, session.captureMode)
                         }
                         AnalysisSessionState.COMPLETED -> {
                             MetricsContent(metrics, final = true)
-                            MetadataContent(metadata)
+                            MetadataContent(metadata, session.captureMode)
                             Text("La sesión terminó sin almacenar contenido de tráfico.")
                             uploadMessage?.let {
                                 Text(
@@ -191,11 +194,31 @@ fun AnalysisScreen(
             }
 
             when (session.state) {
-                AnalysisSessionState.READY -> Button(
-                    onClick = onStart,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Autorizar e iniciar")
+                AnalysisSessionState.READY -> {
+                    Button(
+                        onClick = onStartControlled,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Iniciar validación controlada")
+                    }
+                    Button(
+                        onClick = onStartFull,
+                        enabled = relayStatus?.available == true && fullModeSupported,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Iniciar captura completa experimental")
+                    }
+                    if (!fullModeSupported) {
+                        Text(
+                            "El modo completo requiere Android 13 o superior.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else if (relayStatus?.available != true) {
+                        Text(
+                            "Comprueba primero el transporte local.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
                 AnalysisSessionState.ANALYZING -> Button(
                     onClick = onStop,
@@ -241,7 +264,7 @@ private fun MetricsContent(metrics: TrafficMetrics, final: Boolean) {
 }
 
 @Composable
-private fun MetadataContent(metadata: TrafficMetadataSummary) {
+private fun MetadataContent(metadata: TrafficMetadataSummary, captureMode: CaptureMode) {
     Text(
         "Metadatos interpretados",
         style = MaterialTheme.typography.titleMedium,
@@ -259,8 +282,12 @@ private fun MetadataContent(metadata: TrafficMetadataSummary) {
         Text("Paquetes no interpretados: ${metadata.unparsedPackets}")
     }
     Text(
-        "Estos valores provienen de paquetes controlados de validación; todavía no representan " +
-                "todo el tráfico del emulador.",
+        if (captureMode == CaptureMode.CONTROLLED) {
+            "Estos valores provienen de paquetes controlados de validación."
+        } else {
+            "El motor nativo reenvía el tráfico completo; la clasificación detallada de " +
+                    "protocolos todavía está en desarrollo."
+        },
         style = MaterialTheme.typography.bodySmall
     )
 }
