@@ -18,7 +18,7 @@ class CaptureModeTest {
     fun fullModeCannotRunWithoutForwarder() {
         val plan = VpnCapturePlans.full
         assertTrue(plan.routes.contains(VpnRoute("0.0.0.0", 0)))
-        assertTrue(plan.routes.contains(VpnRoute("::", 0)))
+        assertFalse(plan.routes.contains(VpnRoute("::", 0)))
         assertTrue(plan.requiresPacketForwarder)
         assertFalse(plan.generateValidationTraffic)
     }

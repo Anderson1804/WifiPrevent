@@ -33,7 +33,7 @@ object VpnCapturePlans {
         sessionName = "WiFiPrevent - captura completa",
         ipv4Address = "10.77.0.2",
         ipv4PrefixLength = 32,
-        routes = listOf(VpnRoute("0.0.0.0", 0), VpnRoute("::", 0)),
+        routes = listOf(VpnRoute("0.0.0.0", 0)),
         generateValidationTraffic = false,
         requiresPacketForwarder = true
     )
