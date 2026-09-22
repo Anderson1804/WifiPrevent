@@ -6,6 +6,7 @@ import android.os.SystemClock
 import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
+import com.anderson.wifiprevent.domain.traffic.CaptureMode
 import kotlin.math.max
 
 data class StoredAnalysisSession(
@@ -15,6 +16,7 @@ data class StoredAnalysisSession(
     val state: AnalysisSessionState,
     val metrics: TrafficMetrics,
     val metadata: TrafficMetadataSummary,
+    val captureMode: CaptureMode,
     val uploaded: Boolean
 )
 
@@ -24,11 +26,12 @@ class AnalysisSessionStore(context: Context) {
         Context.MODE_PRIVATE
     )
 
-    fun start(sessionId: String, ssid: String?, securityType: String?) {
+    fun start(sessionId: String, ssid: String?, securityType: String?, captureMode: CaptureMode) {
         preferences.edit()
             .putString("session_id", sessionId)
             .putString("ssid", ssid)
             .putString("security_type", securityType)
+            .putString("capture_mode", captureMode.apiValue)
             .putString("state", AnalysisSessionState.ANALYZING.name)
             .putLong("started_at", SystemClock.elapsedRealtime())
             .putLong("base_rx_bytes", counter(TrafficStats.getTotalRxBytes()))
@@ -101,6 +104,9 @@ class AnalysisSessionStore(context: Context) {
             state,
             metrics,
             metadataSnapshot(),
+            CaptureMode.entries.firstOrNull {
+                it.apiValue == preferences.getString("capture_mode", null)
+            } ?: CaptureMode.CONTROLLED,
             preferences.getBoolean("uploaded", false)
         )
     }
