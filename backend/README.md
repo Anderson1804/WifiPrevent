@@ -35,6 +35,14 @@ JNI del motor. La configuración preparada usa el TUN `10.77.0.2`,
 el relé `10.0.2.2:1080`, UDP directo y registros nativos deshabilitados. El archivo
 se generará en el almacenamiento privado de la aplicación y no contendrá credenciales.
 
+En Android 13 o superior, la pantalla ofrece una captura completa experimental
+después de comprobar el transporte. En esta etapa el túnel enruta IPv4, configura DNS y
+excluye `10.0.2.2/32` para que la conexión con el relé del emulador no vuelva a
+entrar a la propia VPN. IPv6 permanece fuera del túnel hasta incorporar un relé UDP
+de doble pila. Cada sesión conserva `capture_mode` como `controlled`
+o `full`. En el modo completo actual se validan reenvío y volumen; la clasificación
+detallada de protocolos todavía no está conectada al motor nativo.
+
 Para habilitar el acceso del teléfono, abrir PowerShell como administrador y ejecutar:
 
 ```powershell

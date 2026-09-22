@@ -58,6 +58,26 @@ def test_analysis_retry_is_idempotent(client, headers):
     assert len(client.get("/api/v1/analysis-sessions", headers=headers).json()["items"]) == 1
 
 
+def test_full_capture_mode_is_preserved(client, headers):
+    payload = reading() | {
+        "capture_mode": "full",
+        "parsed_packets": 0,
+        "ipv4_packets": 0,
+        "udp_packets": 0,
+        "dns_packets": 0,
+        "tls_or_quic_packets": 0,
+        "unique_destinations": 0,
+    }
+
+    response = client.post("/api/v1/analysis-sessions", json=payload, headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["capture_mode"] == "full"
+    assert response.json()["indicators"][0]["code"] == "no_parsed_packets"
+    item = client.get("/api/v1/analysis-sessions", headers=headers).json()["items"][0]
+    assert item["capture_mode"] == "full"
+
+
 def test_session_id_cannot_be_reused_with_other_metrics(client, headers):
     payload = reading()
     assert client.post("/api/v1/analysis-sessions", json=payload, headers=headers).status_code == 200
