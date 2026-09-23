@@ -282,8 +282,12 @@ private fun AnalysisHistoryCard(
             }
             Text(
                 if (entry.captureMode == "full" && entry.trafficAnalysisPerformed) {
-                    "Alcance actual: seguridad de la red y comportamiento agregado del túnel IPv4. " +
-                            "La clasificación detallada de protocolos está pendiente."
+                    if (entry.relayMetricsCollected) {
+                        "Alcance actual: seguridad de la red, volumen del túnel IPv4 y " +
+                                "observaciones del relé clasificadas por puerto, sin inspeccionar contenido."
+                    } else {
+                        "Alcance actual: seguridad de la red y comportamiento agregado del túnel IPv4."
+                    }
                 } else {
                     "Alcance actual: metadatos de conexión y una muestra controlada de " +
                             "protocolos y destinos. Todavía no representa todo el tráfico."
@@ -291,6 +295,24 @@ private fun AnalysisHistoryCard(
                 style = MaterialTheme.typography.bodySmall
             )
             AnalysisMetrics(entry.metrics)
+            if (entry.relayMetricsCollected) {
+                Text("Observaciones del relé", fontWeight = FontWeight.Bold)
+                Text(
+                    "Conexiones TCP: ${entry.relayMetrics.tcpConnections} · " +
+                            "datagramas UDP: ${entry.relayMetrics.udpDatagrams}"
+                )
+                Text(
+                    "DNS: ${entry.relayMetrics.dnsObservations} · " +
+                            "HTTP: ${entry.relayMetrics.httpObservations}"
+                )
+                Text("TLS/QUIC: ${entry.relayMetrics.tlsOrQuicObservations}")
+                Text("Otros: ${entry.relayMetrics.otherObservations}")
+                Text("Destinos únicos: ${entry.relayMetrics.uniqueDestinations}")
+                Text(
+                    "Las categorías se infieren por puerto y no inspeccionan contenido.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             if (entry.captureMode == "controlled") StoredMetadata(entry.metadata)
             Text("Sesión: ${entry.id}", style = MaterialTheme.typography.bodySmall)
             TextButton(

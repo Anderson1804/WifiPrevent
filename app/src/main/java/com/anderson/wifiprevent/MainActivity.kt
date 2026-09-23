@@ -461,6 +461,28 @@ class MainActivity : ComponentActivity() {
             captureMode = mode
         )
 
+        if (mode == CaptureMode.FULL) {
+            val sessionId = analysisSession?.id ?: return
+            analysisUploadMessage = "Preparando métricas privadas del relé…"
+            lifecycleScope.launch {
+                try {
+                    connectionRepository.startRelayCapture(sessionId)
+                    analysisUploadMessage = null
+                    continueAnalysisAuthorization()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    analysisSession = analysisSession?.copy(state = AnalysisSessionState.READY)
+                    analysisUploadError = true
+                    analysisUploadMessage = e.message ?: "No se pudo preparar el relé local."
+                }
+            }
+        } else {
+            continueAnalysisAuthorization()
+        }
+    }
+
+    private fun continueAnalysisAuthorization() {
         if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(
@@ -586,7 +608,12 @@ class MainActivity : ComponentActivity() {
         analysisUploadMessage = "Guardando la sesión en el servidor local…"
         lifecycleScope.launch {
             try {
-                val receipt = connectionRepository.saveAnalysis(stored)
+                val enriched = if (stored.captureMode == CaptureMode.FULL) {
+                    stored.copy(
+                        relayMetrics = connectionRepository.getRelayCaptureMetrics(stored.id)
+                    )
+                } else stored
+                val receipt = connectionRepository.saveAnalysis(enriched)
                 analysisSessionStore.markUploaded(receipt.sessionId)
                 val reasons = receipt.riskReasons.joinToString(separator = "\n") { "• $it" }
                 analysisUploadMessage = buildString {
