@@ -37,6 +37,7 @@ def test_completed_session_is_saved_and_listed(client, headers):
     assert response.json()["risk_level"] == "low"
     assert response.json()["risk_reasons"]
     assert response.json()["assessment_scope"] == "connection_metadata"
+    assert response.json()["assessment_version"] == "rules-aggregate-v1"
     assert response.json()["traffic_analysis_performed"] is False
     assert response.json()["capture_mode"] == "controlled"
     assert response.json()["indicators"][0]["code"] == "controlled_sample"
@@ -46,6 +47,7 @@ def test_completed_session_is_saved_and_listed(client, headers):
     assert item["received_at"].endswith("Z")
     assert item["risk_level"] == "low"
     assert item["assessment_scope"] == "connection_metadata"
+    assert item["assessment_version"] == "rules-aggregate-v1"
     assert item["capture_mode"] == "controlled"
     assert item["indicators"]
 
