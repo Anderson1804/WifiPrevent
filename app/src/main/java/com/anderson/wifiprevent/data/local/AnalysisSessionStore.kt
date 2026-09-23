@@ -7,6 +7,7 @@ import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
 import com.anderson.wifiprevent.domain.traffic.CaptureMode
+import com.anderson.wifiprevent.data.vpn.TunnelTrafficCounters
 import kotlin.math.max
 
 data class StoredAnalysisSession(
@@ -43,6 +44,10 @@ class AnalysisSessionStore(context: Context) {
             .remove("final_tx_bytes")
             .remove("final_rx_packets")
             .remove("final_tx_packets")
+            .remove("tunnel_rx_bytes")
+            .remove("tunnel_tx_bytes")
+            .remove("tunnel_rx_packets")
+            .remove("tunnel_tx_packets")
             .putBoolean("uploaded", false)
             .putMetadata(TrafficMetadataSummary.EMPTY)
             .commit()
@@ -67,6 +72,18 @@ class AnalysisSessionStore(context: Context) {
 
     fun updateMetadata(summary: TrafficMetadataSummary) {
         preferences.edit().putMetadata(summary).apply()
+    }
+
+    fun updateTunnelCounters(counters: TunnelTrafficCounters) {
+        if (preferences.getString("capture_mode", null) != CaptureMode.FULL.apiValue ||
+            preferences.getString("state", null) != AnalysisSessionState.ANALYZING.name
+        ) return
+        preferences.edit()
+            .putLong("tunnel_rx_bytes", counters.receivedBytes)
+            .putLong("tunnel_tx_bytes", counters.transmittedBytes)
+            .putLong("tunnel_rx_packets", counters.receivedPackets)
+            .putLong("tunnel_tx_packets", counters.transmittedPackets)
+            .apply()
     }
 
     fun fail() {
@@ -128,6 +145,16 @@ class AnalysisSessionStore(context: Context) {
 
     private fun liveMetrics(): TrafficMetrics {
         val startedAt = preferences.getLong("started_at", SystemClock.elapsedRealtime())
+        val mode = preferences.getString("capture_mode", CaptureMode.CONTROLLED.apiValue)
+        if (mode == CaptureMode.FULL.apiValue) {
+            return TrafficMetrics(
+                durationSeconds = max(0, SystemClock.elapsedRealtime() - startedAt) / 1_000,
+                receivedBytes = preferences.getLong("tunnel_rx_bytes", 0),
+                transmittedBytes = preferences.getLong("tunnel_tx_bytes", 0),
+                receivedPackets = preferences.getLong("tunnel_rx_packets", 0),
+                transmittedPackets = preferences.getLong("tunnel_tx_packets", 0)
+            )
+        }
         return TrafficMetrics(
             durationSeconds = max(0, SystemClock.elapsedRealtime() - startedAt) / 1_000,
             receivedBytes = delta(TrafficStats.getTotalRxBytes(), "base_rx_bytes"),
