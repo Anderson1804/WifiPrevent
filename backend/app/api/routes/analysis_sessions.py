@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 
@@ -20,6 +20,25 @@ from app.services import evaluate_analysis_risk, evaluate_traffic_indicators
 
 
 router = APIRouter(prefix="/api/v1/analysis-sessions", tags=["analysis-sessions"])
+
+
+@router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_analysis_session(
+        session_id: UUID,
+        session: DatabaseSession,
+        owner: OwnerHash,
+) -> Response:
+    record = session.scalar(
+        select(AnalysisSessionRecord).where(
+            AnalysisSessionRecord.session_id == session_id,
+            AnalysisSessionRecord.owner_hash == owner,
+        )
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada.")
+    session.delete(record)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/summary", response_model=AnalysisHistorySummary)

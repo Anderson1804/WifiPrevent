@@ -114,6 +114,10 @@ los registros sin información suficiente y los registros históricos no evaluad
 GET /api/v1/analysis-sessions acepta los filtros opcionales `risk_level` (`low`,
 `medium`, `high` o `unknown`) y `capture_mode` (`controlled` o `full`). Los filtros
 se mantienen durante la paginación y solo consultan la instalación autenticada.
+DELETE /api/v1/analysis-sessions/{session_id} elimina una sesión únicamente cuando
+pertenece a la instalación autenticada. Devuelve 204 sin contenido; para evitar
+confirmar la existencia de datos ajenos, una sesión inexistente o de otra instalación
+devuelve 404.
 
 ## Pruebas
 

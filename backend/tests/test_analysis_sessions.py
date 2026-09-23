@@ -163,6 +163,31 @@ def test_analysis_history_rejects_unknown_filters(client, headers, params):
     assert response.status_code == 422
 
 
+def test_analysis_session_can_only_be_deleted_by_its_installation(client, headers):
+    payload = reading()
+    assert client.post(
+        "/api/v1/analysis-sessions", json=payload, headers=headers,
+    ).status_code == 200
+    other_headers = {"Authorization": "Bearer " + "c" * 64}
+
+    denied = client.delete(
+        f"/api/v1/analysis-sessions/{payload['session_id']}", headers=other_headers,
+    )
+    assert denied.status_code == 404
+
+    deleted = client.delete(
+        f"/api/v1/analysis-sessions/{payload['session_id']}", headers=headers,
+    )
+    assert deleted.status_code == 204
+    assert deleted.content == b""
+    assert client.get(
+        "/api/v1/analysis-sessions", headers=headers,
+    ).json()["items"] == []
+    assert client.get(
+        "/api/v1/analysis-sessions/summary", headers=headers,
+    ).json()["total_sessions"] == 0
+
+
 def test_session_id_cannot_be_reused_with_other_metrics(client, headers):
     payload = reading()
     assert client.post("/api/v1/analysis-sessions", json=payload, headers=headers).status_code == 200
