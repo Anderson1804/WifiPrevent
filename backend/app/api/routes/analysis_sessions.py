@@ -36,6 +36,11 @@ def save_analysis_session(
     )
     indicators = evaluate_traffic_indicators(
         capture_mode=reading.capture_mode,
+        duration_seconds=reading.duration_seconds,
+        received_bytes=reading.received_bytes,
+        transmitted_bytes=reading.transmitted_bytes,
+        received_packets=reading.received_packets,
+        transmitted_packets=reading.transmitted_packets,
         parsed_packets=reading.parsed_packets,
         unparsed_packets=reading.unparsed_packets,
         ipv4_packets=reading.ipv4_packets,
