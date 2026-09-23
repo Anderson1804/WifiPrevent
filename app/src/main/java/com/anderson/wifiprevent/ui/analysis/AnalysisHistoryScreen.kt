@@ -110,18 +110,16 @@ private fun AnalysisHistoryCard(entry: AnalysisHistoryEntry) {
                     Text(indicator.description, style = MaterialTheme.typography.bodySmall)
                 }
             }
-            if (!entry.trafficAnalysisPerformed) {
-                Text(
-                    if (entry.captureMode == "full") {
-                        "Alcance actual: volumen real del túnel IPv4 y metadatos de conexión. " +
-                                "La clasificación detallada de protocolos está pendiente."
-                    } else {
-                        "Alcance actual: metadatos de conexión y una muestra controlada de " +
-                                "protocolos y destinos. Todavía no representa todo el tráfico."
-                    },
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
+            Text(
+                if (entry.captureMode == "full" && entry.trafficAnalysisPerformed) {
+                    "Alcance actual: seguridad de la red y comportamiento agregado del túnel IPv4. " +
+                            "La clasificación detallada de protocolos está pendiente."
+                } else {
+                    "Alcance actual: metadatos de conexión y una muestra controlada de " +
+                            "protocolos y destinos. Todavía no representa todo el tráfico."
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
             AnalysisMetrics(entry.metrics)
             if (entry.captureMode == "controlled") StoredMetadata(entry.metadata)
             Text("Sesión: ${entry.id}", style = MaterialTheme.typography.bodySmall)
