@@ -16,7 +16,7 @@ from app.schemas.analysis_session import (
     AnalysisSessionReading,
     AnalysisSessionReceipt,
 )
-from app.services import evaluate_analysis_risk, evaluate_traffic_indicators
+from app.services import ASSESSMENT_VERSION, evaluate_analysis_risk, evaluate_traffic_indicators
 
 
 router = APIRouter(prefix="/api/v1/analysis-sessions", tags=["analysis-sessions"])
@@ -107,6 +107,7 @@ def save_analysis_session(
                 if reading.capture_mode == "full"
                 else "connection_metadata"
             ),
+            assessment_version=ASSESSMENT_VERSION,
             traffic_analysis_performed=reading.capture_mode == "full",
             indicators=[indicator.__dict__ for indicator in indicators],
         )
@@ -137,6 +138,7 @@ def save_analysis_session(
         risk_level=row.risk_level,
         risk_reasons=row.risk_reasons,
         assessment_scope=row.assessment_scope,
+        assessment_version=row.assessment_version,
         traffic_analysis_performed=row.traffic_analysis_performed,
         capture_mode=row.capture_mode,
         indicators=row.indicators,
