@@ -37,8 +37,10 @@ se generará en el almacenamiento privado de la aplicación y no contendrá cred
 El relé ya clasifica en memoria las conexiones TCP y los datagramas UDP por el puerto
 de destino: DNS, HTTP, TLS/QUIC u otros. Los destinos únicos se representan mediante
 HMAC con una clave aleatoria que solo vive durante el proceso; la instantánea expone
-únicamente el total y no las direcciones. Estos contadores todavía no se asocian con el
-UUID de una sesión ni se envían al historial.
+únicamente el total y no las direcciones. Un canal HTTP de control limitado a
+`127.0.0.1:1081` permite a FastAPI
+reiniciar el acumulador para un UUID y recuperar su instantánea. No está expuesto a la
+red local y solo acepta operaciones de inicio y lectura de métricas agregadas.
 
 En Android 13 o superior, la pantalla ofrece una captura completa experimental
 después de comprobar el transporte. En esta etapa el túnel enruta IPv4, configura DNS y
@@ -123,11 +125,18 @@ DELETE /api/v1/analysis-sessions/{session_id} elimina una sesión únicamente cu
 pertenece a la instalación autenticada. Devuelve 204 sin contenido; para evitar
 confirmar la existencia de datos ajenos, una sesión inexistente o de otra instalación
 devuelve 404.
+POST /api/v1/relay-captures/{session_id}/start prepara en el relé el acumulador de una
+captura completa. GET /api/v1/relay-captures/{session_id} devuelve su instantánea
+agregada. Ambos requieren la identidad de instalación; FastAPI se comunica con el
+control interno del relé únicamente por loopback. Android prepara el acumulador antes
+de solicitar la VPN y recupera la instantánea cuando termina la sesión.
 Cada sesión guarda `assessment_version`, que identifica la versión de reglas utilizada
 para producir su evaluación. La migración marca como `legacy` los resultados calculados
 antes de incorporar este versionado; no vuelve a calcular ni altera su nivel original.
-Las sesiones que incorporan la señal de portal cautivo usan `rules-aggregate-v2`.
-Las sesiones `v1` permanecen sin cambios.
+Las sesiones que incorporaron la señal de portal cautivo usan `rules-aggregate-v2`.
+Las capturas completas con observaciones del relé usan `rules-relay-v3`. Las sesiones
+sin esas observaciones continúan con `rules-aggregate-v2`. Las sesiones anteriores
+permanecen sin cambios.
 Las sesiones nuevas también guardan `captive_portal`, tomado del estado de red que
 Android informa al iniciar la captura. La evaluación lo describe como una condición
 que requiere autenticación y no como prueba de que la red sea maliciosa. Los registros

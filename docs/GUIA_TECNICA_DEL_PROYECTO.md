@@ -165,8 +165,10 @@ El backend aplica reglas explícitas y versionadas. Actualmente considera:
 - volumen enviado superior a 1 MiB y a tres veces el recibido;
 - uso observado del puerto 80 cuando existen metadatos clasificados.
 
-Las sesiones nuevas identifican el método como `rules-aggregate-v2`. Los registros
-anteriores conservan `legacy` o su versión original para no reescribir resultados.
+Las capturas completas con observaciones del relé identifican el método como
+`rules-relay-v3`; las sesiones sin ellas continúan con `rules-aggregate-v2`. Los registros
+anteriores conservan `legacy`, `rules-aggregate-v1` o `rules-aggregate-v2` para no
+reescribir resultados ya generados.
 
 ### Etapa 6: calidad de muestra
 
@@ -293,8 +295,13 @@ extremo a extremo.
 
 El relé ya dispone de un acumulador en memoria que cuenta conexiones TCP, datagramas
 UDP y categorías sugeridas por el puerto. Para contar destinos únicos utiliza HMAC con
-una clave aleatoria que desaparece al reiniciar el proceso. Falta asociar esta
-instantánea temporal con el UUID de la sesión antes de presentarla en la aplicación.
+una clave aleatoria que desaparece al reiniciar el proceso. FastAPI dispone de endpoints
+autenticados para iniciar el acumulador con un UUID y leer después la instantánea. Android
+usa ese contrato antes de iniciar la VPN y antes de guardar el resultado. La
+comunicación interna usa `127.0.0.1:1081`, por lo que el puerto de control no queda
+expuesto a la red local. PostgreSQL conserva campos distintos para conexiones TCP,
+datagramas UDP y paquetes del túnel, evitando presentar unidades diferentes como si
+fueran equivalentes.
 
 ## 10. Próximas etapas
 
