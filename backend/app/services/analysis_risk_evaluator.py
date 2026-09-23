@@ -2,6 +2,9 @@ from app.services.risk_evaluator import RiskAssessment, evaluate_risk
 from app.services.traffic_indicator_evaluator import is_outbound_volume_dominant
 
 
+ASSESSMENT_VERSION = "rules-aggregate-v1"
+
+
 def evaluate_analysis_risk(
         security_type: str | None,
         capture_mode: str,
