@@ -45,7 +45,9 @@ class AnalysisSessionReceipt(BaseModel):
     status: Literal["completed"] = "completed"
     risk_level: Literal["low", "medium", "high", "unknown"]
     risk_reasons: list[str]
-    assessment_scope: Literal["connection_metadata"] = "connection_metadata"
+    assessment_scope: Literal[
+        "connection_metadata", "connection_and_traffic_metadata"
+    ] = "connection_metadata"
     traffic_analysis_performed: bool = False
     capture_mode: Literal["controlled", "full"]
     indicators: list[TrafficIndicatorSchema]
@@ -78,7 +80,9 @@ class AnalysisSessionItem(BaseModel):
     unique_destinations: int = 0
     risk_level: Literal["low", "medium", "high", "unknown"] | None = None
     risk_reasons: list[str] | None = None
-    assessment_scope: Literal["connection_metadata"] | None = None
+    assessment_scope: Literal[
+        "connection_metadata", "connection_and_traffic_metadata"
+    ] | None = None
     traffic_analysis_performed: bool = False
     capture_mode: Literal["controlled", "full"] = "controlled"
     indicators: list[TrafficIndicatorSchema] = Field(default_factory=list)

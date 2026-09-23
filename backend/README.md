@@ -103,9 +103,11 @@ Ambas operaciones requieren Authorization: Bearer seguido de 64 caracteres hexad
 POST requiere también X-Request-ID: UUID. Repetir la misma solicitud devuelve el
 mismo recibo; reutilizar el identificador con otros datos devuelve 409.
 No se registran cuerpos ni claves en los logs HTTP. El estado `received` confirma
-la persistencia. Las consultas nuevas incluyen `risk_level`, `risk_reasons` y
-`analysis_performed=true`. La clasificación actual usa reglas explícitas sobre el
-tipo de seguridad informado por Android; todavía no utiliza aprendizaje automático.
+la persistencia. Las consultas nuevas incluyen `risk_level`, `risk_reasons` y el
+alcance de la evaluación. En modo `full`, el riesgo combina la seguridad informada
+por Android con señales agregadas del túnel; un volumen de salida predominante puede
+elevar una evaluación baja a media para revisión. La clasificación actual usa reglas
+explícitas y todavía no utiliza aprendizaje automático.
 
 ## Pruebas
 

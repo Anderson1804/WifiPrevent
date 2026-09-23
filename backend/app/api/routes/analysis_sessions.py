@@ -30,7 +30,10 @@ def save_analysis_session(
     values = reading.model_dump()
     assessment = evaluate_analysis_risk(
         security_type=reading.security_type,
+        capture_mode=reading.capture_mode,
         duration_seconds=reading.duration_seconds,
+        received_bytes=reading.received_bytes,
+        transmitted_bytes=reading.transmitted_bytes,
         received_packets=reading.received_packets,
         transmitted_packets=reading.transmitted_packets,
     )
@@ -55,8 +58,12 @@ def save_analysis_session(
             **values,
             risk_level=assessment.level,
             risk_reasons=list(assessment.reasons),
-            assessment_scope="connection_metadata",
-            traffic_analysis_performed=False,
+            assessment_scope=(
+                "connection_and_traffic_metadata"
+                if reading.capture_mode == "full"
+                else "connection_metadata"
+            ),
+            traffic_analysis_performed=reading.capture_mode == "full",
             indicators=[indicator.__dict__ for indicator in indicators],
         )
         .on_conflict_do_nothing(index_elements=[AnalysisSessionRecord.session_id])

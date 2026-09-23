@@ -13,6 +13,18 @@ class TrafficIndicator:
     description: str
 
 
+def is_outbound_volume_dominant(
+        duration_seconds: int,
+        received_bytes: int,
+        transmitted_bytes: int,
+) -> bool:
+    return (
+        duration_seconds >= 5
+        and transmitted_bytes >= 1_048_576
+        and transmitted_bytes > received_bytes * 3
+    )
+
+
 def evaluate_traffic_indicators(
         capture_mode: Literal["controlled", "full"],
         duration_seconds: int,
@@ -79,11 +91,8 @@ def evaluate_traffic_indicators(
                 "mientras se navega o se usa una aplicación con conexión."
             ),
         ))
-    if (
-            capture_mode == "full"
-            and duration_seconds >= 5
-            and transmitted_bytes >= 1_048_576
-            and transmitted_bytes > received_bytes * 3
+    if capture_mode == "full" and is_outbound_volume_dominant(
+            duration_seconds, received_bytes, transmitted_bytes,
     ):
         indicators.append(TrafficIndicator(
             code="outbound_volume_dominant",
