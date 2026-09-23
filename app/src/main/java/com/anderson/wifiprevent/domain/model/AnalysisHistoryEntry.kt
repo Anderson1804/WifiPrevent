@@ -12,6 +12,7 @@ data class AnalysisHistoryEntry(
     val riskLevel: String?,
     val riskReasons: List<String>,
     val assessmentScope: String?,
+    val assessmentVersion: String?,
     val trafficAnalysisPerformed: Boolean,
     val captureMode: String,
     val indicators: List<TrafficIndicator>
