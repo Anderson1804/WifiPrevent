@@ -7,6 +7,7 @@ data class AnalysisHistoryEntry(
     val receivedAt: String,
     val ssid: String?,
     val securityType: String?,
+    val captivePortal: Boolean?,
     val metrics: TrafficMetrics,
     val metadata: TrafficMetadataSummary,
     val riskLevel: String?,

@@ -241,6 +241,13 @@ private fun AnalysisHistoryCard(
             Text(formatAnalysisDate(entry.receivedAt), style = MaterialTheme.typography.labelLarge)
             Text("Seguridad: ${formatSecurityType(entry.securityType)}")
             Text(
+                "Portal cautivo: " + when (entry.captivePortal) {
+                    true -> "detectado"
+                    false -> "no detectado"
+                    null -> "sin dato histórico"
+                }
+            )
+            Text(
                 "Modo: " + if (entry.captureMode == "full") {
                     "captura completa experimental"
                 } else {

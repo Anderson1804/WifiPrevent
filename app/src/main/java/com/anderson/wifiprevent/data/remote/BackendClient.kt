@@ -145,6 +145,7 @@ class BackendClient(context: Context) {
                 put("session_id", session.id)
                 put("ssid", session.ssid ?: JSONObject.NULL)
                 put("security_type", session.securityType ?: JSONObject.NULL)
+                put("captive_portal", session.captivePortal ?: JSONObject.NULL)
                 put("duration_seconds", session.metrics.durationSeconds)
                 put("received_bytes", session.metrics.receivedBytes)
                 put("transmitted_bytes", session.metrics.transmittedBytes)
@@ -203,6 +204,7 @@ class BackendClient(context: Context) {
                     receivedAt = row.getString("received_at"),
                     ssid = row.nullableString("ssid"),
                     securityType = row.nullableString("security_type"),
+                    captivePortal = row.nullableBoolean("captive_portal"),
                     metrics = TrafficMetrics(
                         durationSeconds = row.getLong("duration_seconds"),
                         receivedBytes = row.getLong("received_bytes"),
@@ -266,6 +268,8 @@ class BackendClient(context: Context) {
 
 private fun JSONObject.nullableString(key: String): String? = if (isNull(key)) null else getString(key)
 private fun JSONObject.nullableInt(key: String): Int? = if (isNull(key)) null else getInt(key)
+private fun JSONObject.nullableBoolean(key: String): Boolean? =
+    if (!has(key) || isNull(key)) null else getBoolean(key)
 
 private fun JSONObject.stringList(key: String): List<String> {
     if (!has(key) || isNull(key)) {

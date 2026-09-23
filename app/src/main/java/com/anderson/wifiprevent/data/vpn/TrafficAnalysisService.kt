@@ -74,12 +74,14 @@ class TrafficAnalysisService : VpnService() {
             else -> {
                 val networkName = intent?.getStringExtra(EXTRA_NETWORK_NAME)
                 val securityType = intent?.getStringExtra(EXTRA_SECURITY_TYPE)
+                val captivePortal = intent?.takeIf { it.hasExtra(EXTRA_CAPTIVE_PORTAL) }
+                    ?.getBooleanExtra(EXTRA_CAPTIVE_PORTAL, false)
                 val sessionId = intent?.getStringExtra(EXTRA_SESSION_ID)
                     ?: return START_NOT_STICKY
                 val mode = intent.getStringExtra(EXTRA_CAPTURE_MODE)
                     ?.let { value -> CaptureMode.entries.firstOrNull { it.apiValue == value } }
                     ?: CaptureMode.CONTROLLED
-                sessionStore.start(sessionId, networkName, securityType, mode)
+                sessionStore.start(sessionId, networkName, securityType, captivePortal, mode)
                 startAsForeground(networkName)
                 if (!startCapture(mode)) {
                     sessionStore.fail()
@@ -283,6 +285,7 @@ class TrafficAnalysisService : VpnService() {
         const val EXTRA_NETWORK_NAME = "network_name"
         const val EXTRA_SESSION_ID = "session_id"
         const val EXTRA_SECURITY_TYPE = "security_type"
+        const val EXTRA_CAPTIVE_PORTAL = "captive_portal"
         const val EXTRA_CAPTURE_MODE = "capture_mode"
 
         private const val CHANNEL_ID = "traffic_analysis"

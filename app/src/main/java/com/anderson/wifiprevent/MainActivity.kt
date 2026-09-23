@@ -499,6 +499,9 @@ class MainActivity : ComponentActivity() {
                 TrafficAnalysisService.EXTRA_SECURITY_TYPE,
                 connection?.securityType
             )
+            connection?.let {
+                putExtra(TrafficAnalysisService.EXTRA_CAPTIVE_PORTAL, it.captivePortal)
+            }
             putExtra(
                 TrafficAnalysisService.EXTRA_CAPTURE_MODE,
                 analysisSession?.captureMode?.apiValue

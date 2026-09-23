@@ -14,6 +14,7 @@ data class StoredAnalysisSession(
     val id: String,
     val ssid: String?,
     val securityType: String?,
+    val captivePortal: Boolean?,
     val state: AnalysisSessionState,
     val metrics: TrafficMetrics,
     val metadata: TrafficMetadataSummary,
@@ -27,11 +28,21 @@ class AnalysisSessionStore(context: Context) {
         Context.MODE_PRIVATE
     )
 
-    fun start(sessionId: String, ssid: String?, securityType: String?, captureMode: CaptureMode) {
+    fun start(
+        sessionId: String,
+        ssid: String?,
+        securityType: String?,
+        captivePortal: Boolean?,
+        captureMode: CaptureMode
+    ) {
         preferences.edit()
             .putString("session_id", sessionId)
             .putString("ssid", ssid)
             .putString("security_type", securityType)
+            .apply {
+                if (captivePortal == null) remove("captive_portal")
+                else putBoolean("captive_portal", captivePortal)
+            }
             .putString("capture_mode", captureMode.apiValue)
             .putString("state", AnalysisSessionState.ANALYZING.name)
             .putLong("started_at", SystemClock.elapsedRealtime())
@@ -118,6 +129,9 @@ class AnalysisSessionStore(context: Context) {
             id,
             preferences.getString("ssid", null),
             preferences.getString("security_type", null),
+            if (preferences.contains("captive_portal")) {
+                preferences.getBoolean("captive_portal", false)
+            } else null,
             state,
             metrics,
             metadataSnapshot(),
