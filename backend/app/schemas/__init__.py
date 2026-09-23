@@ -1,4 +1,5 @@
 from app.schemas.analysis_session import (
+    AnalysisHistorySummary,
     AnalysisSessionItem,
     AnalysisSessionPage,
     AnalysisSessionReading,
@@ -12,6 +13,7 @@ from app.schemas.connection_check import (
 )
 
 __all__ = [
+    "AnalysisHistorySummary",
     "AnalysisSessionItem",
     "AnalysisSessionPage",
     "AnalysisSessionReading",

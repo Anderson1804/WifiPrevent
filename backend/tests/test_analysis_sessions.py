@@ -84,6 +84,44 @@ def test_full_capture_mode_is_preserved(client, headers):
     assert item["traffic_analysis_performed"] is True
 
 
+def test_analysis_summary_counts_only_the_current_installation(client, headers):
+    assert client.post(
+        "/api/v1/analysis-sessions", json=reading(), headers=headers,
+    ).status_code == 200
+    assert client.post(
+        "/api/v1/analysis-sessions",
+        json=reading() | {"session_id": str(uuid4()), "security_type": "OPEN", "capture_mode": "full"},
+        headers=headers,
+    ).status_code == 200
+    other_headers = {"Authorization": "Bearer " + "b" * 64}
+    assert client.post(
+        "/api/v1/analysis-sessions",
+        json=reading() | {"session_id": str(uuid4()), "security_type": "WPA_WPA2_PSK"},
+        headers=other_headers,
+    ).status_code == 200
+
+    summary = client.get("/api/v1/analysis-sessions/summary", headers=headers)
+
+    assert summary.status_code == 200
+    assert summary.json() == {
+        "total_sessions": 2,
+        "low_risk": 1,
+        "medium_risk": 0,
+        "high_risk": 1,
+        "unknown_risk": 0,
+        "not_evaluated": 0,
+        "controlled_sessions": 1,
+        "full_sessions": 1,
+    }
+
+
+def test_analysis_summary_is_zero_for_an_installation_without_history(client, headers):
+    response = client.get("/api/v1/analysis-sessions/summary", headers=headers)
+
+    assert response.status_code == 200
+    assert all(value == 0 for value in response.json().values())
+
+
 def test_session_id_cannot_be_reused_with_other_metrics(client, headers):
     payload = reading()
     assert client.post("/api/v1/analysis-sessions", json=payload, headers=headers).status_code == 200

@@ -3,13 +3,14 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import select, tuple_
+from sqlalchemy import func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 
 from app.api.dependencies import DatabaseSession
 from app.core import OwnerHash
 from app.db.models.analysis_session import AnalysisSessionRecord
 from app.schemas.analysis_session import (
+    AnalysisHistorySummary,
     AnalysisSessionItem,
     AnalysisSessionPage,
     AnalysisSessionReading,
@@ -19,6 +20,30 @@ from app.services import evaluate_analysis_risk, evaluate_traffic_indicators
 
 
 router = APIRouter(prefix="/api/v1/analysis-sessions", tags=["analysis-sessions"])
+
+
+@router.get("/summary", response_model=AnalysisHistorySummary)
+def analysis_history_summary(
+        session: DatabaseSession,
+        owner: OwnerHash,
+) -> AnalysisHistorySummary:
+    row = session.execute(
+        select(
+            func.count().label("total_sessions"),
+            func.count().filter(AnalysisSessionRecord.risk_level == "low").label("low_risk"),
+            func.count().filter(AnalysisSessionRecord.risk_level == "medium").label("medium_risk"),
+            func.count().filter(AnalysisSessionRecord.risk_level == "high").label("high_risk"),
+            func.count().filter(AnalysisSessionRecord.risk_level == "unknown").label("unknown_risk"),
+            func.count().filter(AnalysisSessionRecord.risk_level.is_(None)).label("not_evaluated"),
+            func.count().filter(
+                AnalysisSessionRecord.capture_mode == "controlled"
+            ).label("controlled_sessions"),
+            func.count().filter(
+                AnalysisSessionRecord.capture_mode == "full"
+            ).label("full_sessions"),
+        ).where(AnalysisSessionRecord.owner_hash == owner)
+    ).one()
+    return AnalysisHistorySummary(**row._mapping)
 
 
 @router.post("", response_model=AnalysisSessionReceipt)

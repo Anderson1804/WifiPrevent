@@ -91,3 +91,14 @@ class AnalysisSessionItem(BaseModel):
 class AnalysisSessionPage(BaseModel):
     items: list[AnalysisSessionItem]
     next_before: UUID | None = None
+
+
+class AnalysisHistorySummary(BaseModel):
+    total_sessions: int
+    low_risk: int
+    medium_risk: int
+    high_risk: int
+    unknown_risk: int
+    not_evaluated: int
+    controlled_sessions: int
+    full_sessions: int
