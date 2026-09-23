@@ -2,13 +2,81 @@
 
 import argparse
 import asyncio
+from dataclasses import dataclass
+import hashlib
+import hmac
 import ipaddress
 import logging
+import secrets
 import socket
 
 
 LOGGER = logging.getLogger("wifiprevent.socks5")
 SOCKS_VERSION = 5
+
+
+@dataclass(frozen=True)
+class RelayMetricsSnapshot:
+    tcp_connections: int
+    udp_datagrams: int
+    dns_observations: int
+    http_observations: int
+    tls_or_quic_observations: int
+    other_observations: int
+    unique_destinations: int
+
+
+class RelayTrafficMetrics:
+    """Keep aggregate forwarding observations without retaining destinations."""
+
+    def __init__(self, fingerprint_key: bytes | None = None):
+        self._fingerprint_key = fingerprint_key or secrets.token_bytes(32)
+        self._tcp_connections = 0
+        self._udp_datagrams = 0
+        self._dns_observations = 0
+        self._http_observations = 0
+        self._tls_or_quic_observations = 0
+        self._other_observations = 0
+        self._destination_fingerprints: set[bytes] = set()
+
+    def observe(self, transport: str, host: str, port: int) -> None:
+        if transport == "tcp":
+            self._tcp_connections += 1
+        elif transport == "udp":
+            self._udp_datagrams += 1
+        else:
+            raise ValueError("unsupported transport")
+
+        if port == 53:
+            self._dns_observations += 1
+        elif transport == "tcp" and port == 80:
+            self._http_observations += 1
+        elif port == 443:
+            self._tls_or_quic_observations += 1
+        else:
+            self._other_observations += 1
+
+        normalized_host = host.rstrip(".").lower()
+        fingerprint = hmac.new(
+            self._fingerprint_key,
+            normalized_host.encode("utf-8", errors="replace"),
+            hashlib.sha256,
+        ).digest()
+        self._destination_fingerprints.add(fingerprint)
+
+    def snapshot(self) -> RelayMetricsSnapshot:
+        return RelayMetricsSnapshot(
+            tcp_connections=self._tcp_connections,
+            udp_datagrams=self._udp_datagrams,
+            dns_observations=self._dns_observations,
+            http_observations=self._http_observations,
+            tls_or_quic_observations=self._tls_or_quic_observations,
+            other_observations=self._other_observations,
+            unique_destinations=len(self._destination_fingerprints),
+        )
+
+
+RELAY_METRICS = RelayTrafficMetrics()
 
 
 async def read_destination(reader: asyncio.StreamReader, address_type: int) -> str:
@@ -89,8 +157,9 @@ def decode_udp_request(data: bytes):
 
 
 class UdpAssociation(asyncio.DatagramProtocol):
-    def __init__(self, allowed_client_host: str):
+    def __init__(self, allowed_client_host: str, metrics: RelayTrafficMetrics):
         self.allowed_client_host = allowed_client_host
+        self.metrics = metrics
         self.client = None
         self.transport = None
 
@@ -106,6 +175,7 @@ class UdpAssociation(asyncio.DatagramProtocol):
                 return
             self.client = address
             host, port, payload = request
+            self.metrics.observe("udp", host, port)
             self.transport.sendto(payload, (host, port))
             return
         if self.client is not None:
@@ -116,7 +186,11 @@ class UdpAssociation(asyncio.DatagramProtocol):
             self.transport.sendto(response, self.client)
 
 
-async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+async def handle_client(
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+        metrics: RelayTrafficMetrics = RELAY_METRICS,
+) -> None:
     upstream_writer = None
     try:
         version, method_count = await reader.readexactly(2)
@@ -146,7 +220,7 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
             loop = asyncio.get_running_loop()
             client_host = writer.get_extra_info("peername")[0]
             transport, _ = await loop.create_datagram_endpoint(
-                lambda: UdpAssociation(client_host),
+                lambda: UdpAssociation(client_host, metrics),
                 local_addr=("127.0.0.1", 0),
             )
             try:
@@ -166,6 +240,7 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
             return
 
         await send_reply(writer, 0, upstream_writer.get_extra_info("sockname"))
+        metrics.observe("tcp", host, port)
         LOGGER.info("Conexión TCP reenviada")
         tasks = {
             asyncio.create_task(copy_stream(reader, upstream_writer)),

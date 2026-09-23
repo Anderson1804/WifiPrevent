@@ -2,8 +2,9 @@ import asyncio
 import socket
 import threading
 import socketserver
+from functools import partial
 
-from socks5_relay import handle_client
+from socks5_relay import RelayTrafficMetrics, handle_client
 
 
 def receive_exact(connection, size):
@@ -128,3 +129,39 @@ def test_udp_associate_relays_datagrams_without_storing_payload():
             destination.shutdown()
             destination.server_close()
             destination_thread.join(3)
+
+
+def test_metrics_classify_ports_and_count_unique_destinations_without_storing_hosts():
+    metrics = RelayTrafficMetrics(fingerprint_key=b"test-key")
+
+    metrics.observe("udp", "1.1.1.1", 53)
+    metrics.observe("udp", "1.1.1.1", 53)
+    metrics.observe("tcp", "example.test", 80)
+    metrics.observe("tcp", "secure.test", 443)
+    metrics.observe("udp", "quic.test", 443)
+    metrics.observe("tcp", "other.test", 22)
+    metrics.observe("tcp", "EXAMPLE.TEST.", 80)
+
+    snapshot = metrics.snapshot()
+    assert snapshot.tcp_connections == 4
+    assert snapshot.udp_datagrams == 3
+    assert snapshot.dns_observations == 2
+    assert snapshot.http_observations == 2
+    assert snapshot.tls_or_quic_observations == 2
+    assert snapshot.other_observations == 1
+    assert snapshot.unique_destinations == 5
+    assert not hasattr(snapshot, "destinations")
+
+
+def test_tcp_relay_records_only_a_successful_connection():
+    metrics = RelayTrafficMetrics(fingerprint_key=b"test-key")
+    handler = partial(handle_client, metrics=metrics)
+
+    with AsyncServerThread(echo) as destination, AsyncServerThread(handler) as relay:
+        with socket.create_connection(("127.0.0.1", relay.port), timeout=3) as connection:
+            negotiate(connection)
+            request = b"\x05\x01\x00\x01" + socket.inet_aton("127.0.0.1")
+            connection.sendall(request + destination.port.to_bytes(2, "big"))
+            assert receive_exact(connection, 10)[1] == 0
+
+    assert metrics.snapshot().tcp_connections == 1
