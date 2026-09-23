@@ -6,6 +6,7 @@ from app.api.routes import (
     analysis_sessions_router,
     connection_checks_router,
     health_router,
+    relay_captures_router,
 )
 
 
@@ -21,6 +22,7 @@ app = FastAPI(
 app.include_router(health_router)
 app.include_router(connection_checks_router)
 app.include_router(analysis_sessions_router)
+app.include_router(relay_captures_router)
 
 
 @app.exception_handler(SQLAlchemyError)

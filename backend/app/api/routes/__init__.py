@@ -1,10 +1,12 @@
 from app.api.routes.analysis_sessions import router as analysis_sessions_router
 from app.api.routes.connection_checks import router as connection_checks_router
 from app.api.routes.health import router as health_router
+from app.api.routes.relay_captures import router as relay_captures_router
 
 
 __all__ = [
     "analysis_sessions_router",
     "connection_checks_router",
     "health_router",
+    "relay_captures_router",
 ]
