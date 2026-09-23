@@ -42,6 +42,10 @@ entrar a la propia VPN. IPv6 permanece fuera del túnel hasta incorporar un rel�
 de doble pila. Cada sesión conserva `capture_mode` como `controlled`
 o `full`. En el modo completo actual se validan reenvío y volumen; la clasificación
 detallada de protocolos todavía no está conectada al motor nativo.
+Las sesiones `full` muestran paquetes y bytes leídos y escritos por el motor en
+la interfaz TUN; se muestrean cada segundo y se conserva una lectura final antes
+de detener el motor. Las sesiones `controlled` mantienen los contadores agregados
+de Android utilizados para la validación.
 
 Para habilitar el acceso del teléfono, abrir PowerShell como administrador y ejecutar:
 
