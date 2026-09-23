@@ -179,10 +179,20 @@ class BackendClient(context: Context) {
             )
         }
 
-    suspend fun analysisHistory(before: String? = null): AnalysisHistoryPage =
+    suspend fun analysisHistory(
+        before: String? = null,
+        riskLevel: String? = null,
+        captureMode: String? = null
+    ): AnalysisHistoryPage =
         withContext(Dispatchers.IO) {
-            val cursor = before?.let { "&before=${UUID.fromString(it)}" } ?: ""
-            val response = request("GET", "/api/v1/analysis-sessions?limit=20$cursor")
+            val parameters = mutableListOf("limit=20")
+            before?.let { parameters += "before=${UUID.fromString(it)}" }
+            riskLevel?.let { parameters += "risk_level=$it" }
+            captureMode?.let { parameters += "capture_mode=$it" }
+            val response = request(
+                "GET",
+                "/api/v1/analysis-sessions?${parameters.joinToString("&")}"
+            )
             val array = response.getJSONArray("items")
             val entries = (0 until array.length()).map { index ->
                 val row = array.getJSONObject(index)

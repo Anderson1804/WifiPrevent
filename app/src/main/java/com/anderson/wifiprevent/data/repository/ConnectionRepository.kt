@@ -28,8 +28,12 @@ class ConnectionRepository(
         return backendClient.sendAnalysis(session)
     }
 
-    suspend fun getAnalysisHistory(before: String? = null): AnalysisHistoryPage {
-        return backendClient.analysisHistory(before)
+    suspend fun getAnalysisHistory(
+        before: String? = null,
+        riskLevel: String? = null,
+        captureMode: String? = null
+    ): AnalysisHistoryPage {
+        return backendClient.analysisHistory(before, riskLevel, captureMode)
     }
 
     suspend fun getAnalysisHistorySummary(): AnalysisHistorySummary {

@@ -5,10 +5,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -33,12 +37,16 @@ import java.util.Locale
 fun AnalysisHistoryScreen(
     entries: List<AnalysisHistoryEntry>,
     summary: AnalysisHistorySummary?,
+    riskFilter: String?,
+    captureModeFilter: String?,
     loading: Boolean,
     error: String?,
     hasMore: Boolean,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onMore: () -> Unit,
+    onRiskFilterChange: (String?) -> Unit,
+    onCaptureModeFilterChange: (String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -61,6 +69,15 @@ fun AnalysisHistoryScreen(
             ) { Text("Actualizar análisis") }
         }
         summary?.let { value -> item { AnalysisSummaryCard(value) } }
+        item {
+            HistoryFilters(
+                riskFilter = riskFilter,
+                captureModeFilter = captureModeFilter,
+                enabled = !loading,
+                onRiskFilterChange = onRiskFilterChange,
+                onCaptureModeFilterChange = onCaptureModeFilterChange
+            )
+        }
         if (loading) item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
         error?.let { message -> item {
             Text(message, color = MaterialTheme.colorScheme.error)
@@ -76,6 +93,56 @@ fun AnalysisHistoryScreen(
                 enabled = !loading,
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Cargar más") }
+        }
+    }
+}
+
+@Composable
+private fun HistoryFilters(
+    riskFilter: String?,
+    captureModeFilter: String?,
+    enabled: Boolean,
+    onRiskFilterChange: (String?) -> Unit,
+    onCaptureModeFilterChange: (String?) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Filtrar por riesgo", fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(
+                null to "Todos",
+                "low" to "Bajo",
+                "medium" to "Medio",
+                "high" to "Alto",
+                "unknown" to "Sin información"
+            ).forEach { (value, label) ->
+                FilterChip(
+                    selected = riskFilter == value,
+                    enabled = enabled,
+                    onClick = { onRiskFilterChange(value) },
+                    label = { Text(label) }
+                )
+            }
+        }
+        Text("Filtrar por modo", fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(
+                null to "Todos",
+                "controlled" to "Controlada",
+                "full" to "Completa"
+            ).forEach { (value, label) ->
+                FilterChip(
+                    selected = captureModeFilter == value,
+                    enabled = enabled,
+                    onClick = { onCaptureModeFilterChange(value) },
+                    label = { Text(label) }
+                )
+            }
         }
     }
 }

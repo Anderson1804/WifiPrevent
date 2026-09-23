@@ -82,6 +82,8 @@ class MainActivity : ComponentActivity() {
     private var historyHasMore by mutableStateOf(false)
     private var analysisHistoryEntries by mutableStateOf<List<AnalysisHistoryEntry>>(emptyList())
     private var analysisHistorySummary by mutableStateOf<AnalysisHistorySummary?>(null)
+    private var analysisHistoryRiskFilter by mutableStateOf<String?>(null)
+    private var analysisHistoryModeFilter by mutableStateOf<String?>(null)
     private var analysisHistoryLoading by mutableStateOf(false)
     private var analysisHistoryError by mutableStateOf<String?>(null)
     private var analysisHistoryCursor: String? = null
@@ -180,12 +182,28 @@ class MainActivity : ComponentActivity() {
                         AppScreen.ANALYSIS_HISTORY -> AnalysisHistoryScreen(
                             entries = analysisHistoryEntries,
                             summary = analysisHistorySummary,
+                            riskFilter = analysisHistoryRiskFilter,
+                            captureModeFilter = analysisHistoryModeFilter,
                             loading = analysisHistoryLoading,
                             error = analysisHistoryError,
                             hasMore = analysisHistoryHasMore,
                             onBack = { currentScreen = AppScreen.CONNECTION },
                             onRefresh = { loadAnalysisHistory() },
                             onMore = { loadAnalysisHistory(more = true) },
+                            onRiskFilterChange = { value ->
+                                analysisHistoryRiskFilter = value
+                                analysisHistoryEntries = emptyList()
+                                analysisHistoryCursor = null
+                                analysisHistoryHasMore = false
+                                loadAnalysisHistory()
+                            },
+                            onCaptureModeFilterChange = { value ->
+                                analysisHistoryModeFilter = value
+                                analysisHistoryEntries = emptyList()
+                                analysisHistoryCursor = null
+                                analysisHistoryHasMore = false
+                                loadAnalysisHistory()
+                            },
                             modifier = Modifier.padding(padding)
                         )
 
@@ -356,7 +374,11 @@ class MainActivity : ComponentActivity() {
                 if (!more) {
                     analysisHistorySummary = connectionRepository.getAnalysisHistorySummary()
                 }
-                val page = connectionRepository.getAnalysisHistory(cursor)
+                val page = connectionRepository.getAnalysisHistory(
+                    before = cursor,
+                    riskLevel = analysisHistoryRiskFilter,
+                    captureMode = analysisHistoryModeFilter
+                )
                 analysisHistoryEntries = if (more) {
                     (analysisHistoryEntries + page.entries).distinctBy { it.id }
                 } else {
