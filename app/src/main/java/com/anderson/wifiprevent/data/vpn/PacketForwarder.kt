@@ -13,6 +13,19 @@ interface PacketForwarder {
         onPacketObserved: (ByteArray) -> Unit
     ): Boolean
     fun stop()
+    fun counters(): TunnelTrafficCounters?
+}
+
+data class TunnelTrafficCounters(
+    val transmittedPackets: Long,
+    val transmittedBytes: Long,
+    val receivedPackets: Long,
+    val receivedBytes: Long
+)
+
+internal fun nativeCounters(values: LongArray): TunnelTrafficCounters? {
+    if (values.size != 4 || values.any { it < 0 }) return null
+    return TunnelTrafficCounters(values[0], values[1], values[2], values[3])
 }
 
 class PendingPacketForwarder : PacketForwarder {
@@ -25,6 +38,7 @@ class PendingPacketForwarder : PacketForwarder {
         onPacketObserved: (ByteArray) -> Unit
     ): Boolean = false
     override fun stop() = Unit
+    override fun counters(): TunnelTrafficCounters? = null
 }
 
 class HevPacketForwarder(
@@ -57,4 +71,12 @@ class HevPacketForwarder(
             }
         }
     }
+
+    override fun counters(): TunnelTrafficCounters? = runCatching {
+        if (TProxyService.TProxyIsRunning()) {
+            nativeCounters(TProxyService.TProxyGetStats())
+        } else {
+            null
+        }
+    }.getOrNull()
 }
