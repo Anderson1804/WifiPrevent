@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.io.InputStream
 import hev.htproxy.TProxyService
 
 data class SocksRelayStatus(
@@ -29,11 +30,18 @@ class SocksRelayProbe(
                 if (!response.contentEquals(ACCEPTED)) {
                     throw IOException("Respuesta SOCKS5 no compatible")
                 }
+                socket.getOutputStream().apply {
+                    write(UDP_ASSOCIATE_REQUEST)
+                    flush()
+                }
+                if (!validateUdpAssociateReply(readUdpAssociateReply(socket.getInputStream()))) {
+                    throw IOException("El relé no admite asociación UDP")
+                }
             }
             TProxyService.TProxyIsRunning()
             SocksRelayStatus(
                 available = true,
-                message = "Relé SOCKS5 y motor nativo disponibles."
+                message = "Relé SOCKS5 TCP/UDP y motor nativo disponibles."
             )
         }.getOrElse {
             SocksRelayStatus(
@@ -53,5 +61,39 @@ class SocksRelayProbe(
         private const val TIMEOUT_MS = 2_000
         internal val GREETING = byteArrayOf(0x05, 0x01, 0x00)
         internal val ACCEPTED = byteArrayOf(0x05, 0x00)
+        internal val UDP_ASSOCIATE_REQUEST = byteArrayOf(
+            0x05, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        )
     }
+}
+
+private fun readUdpAssociateReply(input: InputStream): ByteArray {
+    val header = input.readNBytes(4)
+    if (header.size != 4) return header
+    val tail = when (header[3].toInt() and 0xFF) {
+        1 -> input.readNBytes(6)
+        4 -> input.readNBytes(18)
+        3 -> {
+            val length = input.read()
+            if (length < 0) return header
+            byteArrayOf(length.toByte()) + input.readNBytes(length + 2)
+        }
+        else -> byteArrayOf()
+    }
+    return header + tail
+}
+
+internal fun validateUdpAssociateReply(response: ByteArray): Boolean {
+    if (response.size < 4 ||
+        response[0] != 0x05.toByte() ||
+        response[1] != 0x00.toByte() ||
+        response[2] != 0x00.toByte()
+    ) return false
+    val expectedSize = when (response[3].toInt() and 0xFF) {
+        1 -> 10
+        4 -> 22
+        3 -> if (response.size >= 5) 7 + (response[4].toInt() and 0xFF) else return false
+        else -> return false
+    }
+    return response.size == expectedSize
 }
