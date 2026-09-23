@@ -57,7 +57,10 @@ def evaluate_traffic_indicators(
         indicators.append(TrafficIndicator(
             code="plaintext_http",
             severity="medium",
-            title="Tráfico HTTP observado",
-            description="Se observaron conexiones por el puerto HTTP, que no cifra por sí solo el contenido.",
+            title="Conexión por el puerto 80",
+            description=(
+                "Se observó una conexión por el puerto 80. El puerto sugiere HTTP, "
+                "pero esta muestra no inspecciona el contenido."
+            ),
         ))
     return tuple(indicators)

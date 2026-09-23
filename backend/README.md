@@ -46,6 +46,11 @@ Las sesiones `full` muestran paquetes y bytes leídos y escritos por el motor en
 la interfaz TUN; se muestrean cada segundo y se conserva una lectura final antes
 de detener el motor. Las sesiones `controlled` mantienen los contadores agregados
 de Android utilizados para la validación.
+En `full`, una modificación local documentada en `docs/third-party/hev-packet-observer.patch`
+entrega hasta 200 cabeceras IPv4 salientes por segundo al clasificador. Las
+categorías DNS, HTTP y HTTPS/QUIC son indicios basados en puertos, no inspección
+del contenido. El nivel de riesgo todavía se calcula a partir de los metadatos
+de conexión Wi-Fi.
 
 Para habilitar el acceso del teléfono, abrir PowerShell como administrador y ejecutar:
 
