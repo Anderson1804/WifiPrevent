@@ -43,4 +43,11 @@ class ConnectionRepository(
     suspend fun deleteAnalysis(sessionId: String) {
         backendClient.deleteAnalysis(sessionId)
     }
+
+    suspend fun startRelayCapture(sessionId: String) {
+        backendClient.startRelayCapture(sessionId)
+    }
+
+    suspend fun getRelayCaptureMetrics(sessionId: String) =
+        backendClient.relayCaptureMetrics(sessionId)
 }

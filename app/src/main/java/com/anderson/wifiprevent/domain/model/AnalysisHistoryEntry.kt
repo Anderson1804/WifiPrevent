@@ -17,7 +17,9 @@ data class AnalysisHistoryEntry(
     val trafficAnalysisPerformed: Boolean,
     val captureMode: String,
     val indicators: List<TrafficIndicator>,
-    val sampleQuality: String
+    val sampleQuality: String,
+    val relayMetricsCollected: Boolean,
+    val relayMetrics: RelayCaptureMetrics
 )
 
 data class AnalysisHistoryPage(

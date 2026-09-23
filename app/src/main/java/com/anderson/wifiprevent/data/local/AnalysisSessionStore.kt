@@ -5,6 +5,7 @@ import android.net.TrafficStats
 import android.os.SystemClock
 import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
+import com.anderson.wifiprevent.domain.model.RelayCaptureMetrics
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
 import com.anderson.wifiprevent.domain.traffic.CaptureMode
 import com.anderson.wifiprevent.data.vpn.TunnelTrafficCounters
@@ -19,7 +20,8 @@ data class StoredAnalysisSession(
     val metrics: TrafficMetrics,
     val metadata: TrafficMetadataSummary,
     val captureMode: CaptureMode,
-    val uploaded: Boolean
+    val uploaded: Boolean,
+    val relayMetrics: RelayCaptureMetrics = RelayCaptureMetrics.EMPTY
 )
 
 class AnalysisSessionStore(context: Context) {

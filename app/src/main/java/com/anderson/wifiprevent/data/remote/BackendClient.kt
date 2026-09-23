@@ -11,6 +11,7 @@ import com.anderson.wifiprevent.domain.model.AnalysisHistoryEntry
 import com.anderson.wifiprevent.domain.model.AnalysisHistorySummary
 import com.anderson.wifiprevent.domain.model.AnalysisHistoryPage
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
+import com.anderson.wifiprevent.domain.model.RelayCaptureMetrics
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
 import com.anderson.wifiprevent.domain.model.TrafficIndicator
 import com.anderson.wifiprevent.data.local.StoredAnalysisSession
@@ -123,7 +124,18 @@ class BackendClient(context: Context) {
                 404 -> error("El registro ya no está disponible. Actualiza el historial.")
                 409 -> error("El identificador del envío tiene otros datos. No se guardó un duplicado.")
                 422 -> error("El servidor rechazó los datos. Revisa la versión de la aplicación.")
-                503 -> error("La base de datos no está disponible. Inicia PostgreSQL y vuelve a intentar.")
+                503 -> {
+                    val detail = runCatching {
+                        val body = connection.errorStream
+                            ?.bufferedReader(Charsets.UTF_8)
+                            ?.use { it.readText() }
+                        body?.let { JSONObject(it).optString("detail") }
+                    }.getOrNull()
+                    error(
+                        detail?.takeIf { it.isNotBlank() }
+                            ?: "Un servicio local no está disponible. Reinicia el backend y vuelve a intentar."
+                    )
+                }
                 else -> error("El servidor respondió con un error ($code). Inténtalo de nuevo.")
             }
         } catch (_: SocketTimeoutException) {
@@ -163,6 +175,14 @@ class BackendClient(context: Context) {
                 put("http_packets", session.metadata.httpPackets)
                 put("tls_or_quic_packets", session.metadata.tlsOrQuicPackets)
                 put("unique_destinations", session.metadata.uniqueDestinations)
+                put("relay_metrics_collected", session.captureMode.apiValue == "full")
+                put("relay_tcp_connections", session.relayMetrics.tcpConnections)
+                put("relay_udp_datagrams", session.relayMetrics.udpDatagrams)
+                put("relay_dns_observations", session.relayMetrics.dnsObservations)
+                put("relay_http_observations", session.relayMetrics.httpObservations)
+                put("relay_tls_or_quic_observations", session.relayMetrics.tlsOrQuicObservations)
+                put("relay_other_observations", session.relayMetrics.otherObservations)
+                put("relay_unique_destinations", session.relayMetrics.uniqueDestinations)
                 put("capture_mode", session.captureMode.apiValue)
             }.toString()
             val reply = request("POST", "/api/v1/analysis-sessions", payload)
@@ -234,7 +254,17 @@ class BackendClient(context: Context) {
                     trafficAnalysisPerformed = row.getBoolean("traffic_analysis_performed"),
                     captureMode = row.getString("capture_mode"),
                     indicators = row.indicators("indicators"),
-                    sampleQuality = row.getString("sample_quality")
+                    sampleQuality = row.getString("sample_quality"),
+                    relayMetricsCollected = row.getBoolean("relay_metrics_collected"),
+                    relayMetrics = RelayCaptureMetrics(
+                        tcpConnections = row.getLong("relay_tcp_connections"),
+                        udpDatagrams = row.getLong("relay_udp_datagrams"),
+                        dnsObservations = row.getLong("relay_dns_observations"),
+                        httpObservations = row.getLong("relay_http_observations"),
+                        tlsOrQuicObservations = row.getLong("relay_tls_or_quic_observations"),
+                        otherObservations = row.getLong("relay_other_observations"),
+                        uniqueDestinations = row.getInt("relay_unique_destinations")
+                    )
                 )
             }
             AnalysisHistoryPage(entries, response.nullableString("next_before"))
@@ -259,6 +289,29 @@ class BackendClient(context: Context) {
         val normalizedId = UUID.fromString(sessionId)
         request("DELETE", "/api/v1/analysis-sessions/$normalizedId")
     }
+
+    suspend fun startRelayCapture(sessionId: String) = withContext(Dispatchers.IO) {
+        val normalizedId = UUID.fromString(sessionId)
+        val reply = request("POST", "/api/v1/relay-captures/$normalizedId/start")
+        require(reply.getString("status") == "ready") {
+            "El relé no confirmó la preparación de la sesión."
+        }
+    }
+
+    suspend fun relayCaptureMetrics(sessionId: String): RelayCaptureMetrics =
+        withContext(Dispatchers.IO) {
+            val normalizedId = UUID.fromString(sessionId)
+            val reply = request("GET", "/api/v1/relay-captures/$normalizedId")
+            RelayCaptureMetrics(
+                tcpConnections = reply.getLong("tcp_connections"),
+                udpDatagrams = reply.getLong("udp_datagrams"),
+                dnsObservations = reply.getLong("dns_observations"),
+                httpObservations = reply.getLong("http_observations"),
+                tlsOrQuicObservations = reply.getLong("tls_or_quic_observations"),
+                otherObservations = reply.getLong("other_observations"),
+                uniqueDestinations = reply.getInt("unique_destinations")
+            )
+        }
 
     private fun isRunningOnEmulator(): Boolean {
         return Build.FINGERPRINT.startsWith("generic") ||
