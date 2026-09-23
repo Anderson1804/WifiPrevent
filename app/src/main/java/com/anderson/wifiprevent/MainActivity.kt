@@ -45,6 +45,7 @@ import com.anderson.wifiprevent.ui.analysis.AnalysisHistoryScreen
 import com.anderson.wifiprevent.ui.history.HistoryScreen
 import com.anderson.wifiprevent.ui.common.formatRiskLevel
 import com.anderson.wifiprevent.ui.common.formatAssessmentVersion
+import com.anderson.wifiprevent.ui.common.formatSampleQuality
 import com.anderson.wifiprevent.ui.theme.WifiPreventTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -592,6 +593,7 @@ class MainActivity : ComponentActivity() {
                     append("${receipt.message}\n")
                     append("Evaluación preliminar: ${formatRiskLevel(receipt.riskLevel, true)}")
                     append("\nMétodo: ${formatAssessmentVersion(receipt.assessmentVersion)}")
+                    append("\nCalidad de la muestra: ${formatSampleQuality(receipt.sampleQuality)}")
                     if (reasons.isNotBlank()) append("\n$reasons")
                     if (!receipt.trafficAnalysisPerformed) {
                         append("\nLa muestra de protocolos es controlada; la captura completa está pendiente.")

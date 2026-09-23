@@ -34,6 +34,7 @@ import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
 import com.anderson.wifiprevent.ui.common.formatSecurityType
 import com.anderson.wifiprevent.ui.common.formatRiskLevel
 import com.anderson.wifiprevent.ui.common.formatAssessmentVersion
+import com.anderson.wifiprevent.ui.common.formatSampleQuality
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -259,6 +260,18 @@ private fun AnalysisHistoryCard(
                 fontWeight = FontWeight.Bold
             )
             Text("Método: ${formatAssessmentVersion(entry.assessmentVersion)}")
+            Text(
+                "Calidad de la muestra: ${formatSampleQuality(entry.sampleQuality)}",
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                when (entry.sampleQuality) {
+                    "adequate" -> "La duración y el volumen permiten una evaluación preliminar más representativa."
+                    "limited" -> "La muestra sirve como referencia, pero conviene realizar una sesión más larga."
+                    else -> "La sesión fue demasiado breve o tuvo pocos paquetes para una evaluación representativa."
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
             entry.riskReasons.forEach { reason -> Text("• $reason") }
             if (entry.indicators.isNotEmpty()) {
                 Text("Observaciones técnicas", fontWeight = FontWeight.Bold)

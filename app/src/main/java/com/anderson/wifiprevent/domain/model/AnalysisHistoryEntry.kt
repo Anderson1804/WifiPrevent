@@ -16,7 +16,8 @@ data class AnalysisHistoryEntry(
     val assessmentVersion: String?,
     val trafficAnalysisPerformed: Boolean,
     val captureMode: String,
-    val indicators: List<TrafficIndicator>
+    val indicators: List<TrafficIndicator>,
+    val sampleQuality: String
 )
 
 data class AnalysisHistoryPage(

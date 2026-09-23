@@ -178,7 +178,8 @@ class BackendClient(context: Context) {
                 assessmentVersion = reply.nullableString("assessment_version"),
                 trafficAnalysisPerformed = reply.getBoolean("traffic_analysis_performed"),
                 captureMode = reply.getString("capture_mode"),
-                indicators = reply.indicators("indicators")
+                indicators = reply.indicators("indicators"),
+                sampleQuality = reply.getString("sample_quality")
             )
         }
 
@@ -232,7 +233,8 @@ class BackendClient(context: Context) {
                     assessmentVersion = row.nullableString("assessment_version"),
                     trafficAnalysisPerformed = row.getBoolean("traffic_analysis_performed"),
                     captureMode = row.getString("capture_mode"),
-                    indicators = row.indicators("indicators")
+                    indicators = row.indicators("indicators"),
+                    sampleQuality = row.getString("sample_quality")
                 )
             }
             AnalysisHistoryPage(entries, response.nullableString("next_before"))
