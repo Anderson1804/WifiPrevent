@@ -73,7 +73,9 @@ def test_full_capture_mode_is_preserved(client, headers):
 
     assert response.status_code == 200
     assert response.json()["capture_mode"] == "full"
-    assert response.json()["indicators"][0]["code"] == "no_parsed_packets"
+    codes = [indicator["code"] for indicator in response.json()["indicators"]]
+    assert "aggregate_tunnel_analysis" in codes
+    assert "no_parsed_packets" not in codes
     item = client.get("/api/v1/analysis-sessions", headers=headers).json()["items"][0]
     assert item["capture_mode"] == "full"
 
