@@ -33,6 +33,7 @@ import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
 import com.anderson.wifiprevent.ui.common.formatSecurityType
 import com.anderson.wifiprevent.ui.common.formatRiskLevel
+import com.anderson.wifiprevent.ui.common.formatAssessmentVersion
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -250,6 +251,7 @@ private fun AnalysisHistoryCard(
                 "Evaluación preliminar: ${formatRiskLevel(entry.riskLevel, entry.assessmentScope != null)}",
                 fontWeight = FontWeight.Bold
             )
+            Text("Método: ${formatAssessmentVersion(entry.assessmentVersion)}")
             entry.riskReasons.forEach { reason -> Text("• $reason") }
             if (entry.indicators.isNotEmpty()) {
                 Text("Observaciones técnicas", fontWeight = FontWeight.Bold)
