@@ -51,6 +51,7 @@ class AnalysisSessionRecord(Base):
     risk_level: Mapped[str | None] = mapped_column(String(32))
     risk_reasons: Mapped[list[str] | None] = mapped_column(JSON)
     assessment_scope: Mapped[str | None] = mapped_column(String(32))
+    assessment_version: Mapped[str | None] = mapped_column(String(32))
     traffic_analysis_performed: Mapped[bool] = mapped_column(Boolean, default=False)
     capture_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="controlled")
     indicators: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
