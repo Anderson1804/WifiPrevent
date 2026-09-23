@@ -122,6 +122,47 @@ def test_analysis_summary_is_zero_for_an_installation_without_history(client, he
     assert all(value == 0 for value in response.json().values())
 
 
+def test_analysis_history_can_filter_by_risk_and_capture_mode(client, headers):
+    low_controlled = reading()
+    high_full = reading() | {
+        "session_id": str(uuid4()),
+        "security_type": "OPEN",
+        "capture_mode": "full",
+    }
+    assert client.post(
+        "/api/v1/analysis-sessions", json=low_controlled, headers=headers,
+    ).status_code == 200
+    assert client.post(
+        "/api/v1/analysis-sessions", json=high_full, headers=headers,
+    ).status_code == 200
+
+    response = client.get(
+        "/api/v1/analysis-sessions",
+        params={"risk_level": "high", "capture_mode": "full"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert [item["session_id"] for item in response.json()["items"]] == [
+        high_full["session_id"]
+    ]
+    mismatched_cursor = client.get(
+        "/api/v1/analysis-sessions",
+        params={"risk_level": "high", "before": low_controlled["session_id"]},
+        headers=headers,
+    )
+    assert mismatched_cursor.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "params",
+    [{"risk_level": "critical"}, {"capture_mode": "automatic"}],
+)
+def test_analysis_history_rejects_unknown_filters(client, headers, params):
+    response = client.get("/api/v1/analysis-sessions", params=params, headers=headers)
+    assert response.status_code == 422
+
+
 def test_session_id_cannot_be_reused_with_other_metrics(client, headers):
     payload = reading()
     assert client.post("/api/v1/analysis-sessions", json=payload, headers=headers).status_code == 200

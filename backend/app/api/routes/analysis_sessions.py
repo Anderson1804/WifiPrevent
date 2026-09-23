@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
@@ -130,15 +130,28 @@ def analysis_history(
         owner: OwnerHash,
         limit: Annotated[int, Query(ge=1, le=100)] = 20,
         before: UUID | None = None,
+        risk_level: Literal["low", "medium", "high", "unknown"] | None = None,
+        capture_mode: Literal["controlled", "full"] | None = None,
 ) -> AnalysisSessionPage:
     statement = select(AnalysisSessionRecord).where(AnalysisSessionRecord.owner_hash == owner)
+    if risk_level is not None:
+        statement = statement.where(AnalysisSessionRecord.risk_level == risk_level)
+    if capture_mode is not None:
+        statement = statement.where(AnalysisSessionRecord.capture_mode == capture_mode)
     if before is not None:
-        cursor = session.scalar(
-            select(AnalysisSessionRecord).where(
-                AnalysisSessionRecord.owner_hash == owner,
-                AnalysisSessionRecord.session_id == before,
-            )
+        cursor_statement = select(AnalysisSessionRecord).where(
+            AnalysisSessionRecord.owner_hash == owner,
+            AnalysisSessionRecord.session_id == before,
         )
+        if risk_level is not None:
+            cursor_statement = cursor_statement.where(
+                AnalysisSessionRecord.risk_level == risk_level
+            )
+        if capture_mode is not None:
+            cursor_statement = cursor_statement.where(
+                AnalysisSessionRecord.capture_mode == capture_mode
+            )
+        cursor = session.scalar(cursor_statement)
         if cursor is None:
             raise HTTPException(status_code=404, detail="Sesión no encontrada.")
         statement = statement.where(

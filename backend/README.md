@@ -111,6 +111,9 @@ explícitas y todavía no utiliza aprendizaje automático.
 GET /api/v1/analysis-sessions/summary devuelve los totales de sesiones por nivel
 de riesgo y modo de captura para la instalación autenticada. Incluye por separado
 los registros sin información suficiente y los registros históricos no evaluados.
+GET /api/v1/analysis-sessions acepta los filtros opcionales `risk_level` (`low`,
+`medium`, `high` o `unknown`) y `capture_mode` (`controlled` o `full`). Los filtros
+se mantienen durante la paginación y solo consultan la instalación autenticada.
 
 ## Pruebas
 
