@@ -34,6 +34,11 @@ La comprobación de transporte valida el saludo SOCKS5, `UDP ASSOCIATE` y la car
 JNI del motor antes de habilitar el modo completo. La configuración preparada usa el TUN `10.77.0.2`,
 el relé `10.0.2.2:1080`, UDP directo y registros nativos deshabilitados. El archivo
 se generará en el almacenamiento privado de la aplicación y no contendrá credenciales.
+El relé ya clasifica en memoria las conexiones TCP y los datagramas UDP por el puerto
+de destino: DNS, HTTP, TLS/QUIC u otros. Los destinos únicos se representan mediante
+HMAC con una clave aleatoria que solo vive durante el proceso; la instantánea expone
+únicamente el total y no las direcciones. Estos contadores todavía no se asocian con el
+UUID de una sesión ni se envían al historial.
 
 En Android 13 o superior, la pantalla ofrece una captura completa experimental
 después de comprobar el transporte. En esta etapa el túnel enruta IPv4, configura DNS y

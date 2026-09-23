@@ -286,10 +286,15 @@ requieren HTTPS, cuentas o autenticación robusta, política de conservación y 
 desplegado de manera segura.
 
 La captura completa clasifica actualmente volumen agregado. La clasificación detallada
-del tráfico real aún no está conectada al motor nativo porque un intento de callback JNI
+del tráfico real aún no está conectada al historial porque un intento de callback JNI
 resultó inestable; se mantuvo la ruta segura de contadores. IPv6 queda fuera del túnel
 completo y la prueba del relé verifica negociación UDP, no una consulta DNS externa de
 extremo a extremo.
+
+El relé ya dispone de un acumulador en memoria que cuenta conexiones TCP, datagramas
+UDP y categorías sugeridas por el puerto. Para contar destinos únicos utiliza HMAC con
+una clave aleatoria que desaparece al reiniciar el proceso. Falta asociar esta
+instantánea temporal con el UUID de la sesión antes de presentarla en la aplicación.
 
 ## 10. Próximas etapas
 
