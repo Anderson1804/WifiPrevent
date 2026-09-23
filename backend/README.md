@@ -30,8 +30,8 @@ permite comprobar la negociación SOCKS5 desde el emulador. El relé acepta TCP 
 confirma el transporte local, pero la captura completa solo empieza después de que
 el usuario la autoriza desde la aplicación.
 La aplicación incluye hev-socks5-tunnel 2.17.1 para `x86_64` y `arm64-v8a`.
-La comprobación de transporte valida tanto la negociación con el relé como la carga
-JNI del motor. La configuración preparada usa el TUN `10.77.0.2`,
+La comprobación de transporte valida el saludo SOCKS5, `UDP ASSOCIATE` y la carga
+JNI del motor antes de habilitar el modo completo. La configuración preparada usa el TUN `10.77.0.2`,
 el relé `10.0.2.2:1080`, UDP directo y registros nativos deshabilitados. El archivo
 se generará en el almacenamiento privado de la aplicación y no contendrá credenciales.
 
