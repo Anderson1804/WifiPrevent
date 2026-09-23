@@ -127,6 +127,12 @@ Las sesiones nuevas también guardan `captive_portal`, tomado del estado de red 
 Android informa al iniciar la captura. La evaluación lo describe como una condición
 que requiere autenticación y no como prueba de que la red sea maliciosa. Los registros
 anteriores conservan `null` para distinguirlos de una detección negativa real.
+Las respuestas de guardado y del historial incluyen `sample_quality`. Este valor se
+calcula con la duración y la cantidad total de paquetes: `insufficient` cuando no se
+alcanzan cinco segundos y diez paquetes, `limited` antes de treinta segundos o cien
+paquetes, y `adequate` cuando se cumplen ambos umbrales. Describe la cobertura de la
+muestra y no modifica por sí mismo el nivel de riesgo. Se calcula también para datos
+históricos, por lo que no necesita una nueva columna ni una migración.
 
 ## Pruebas
 

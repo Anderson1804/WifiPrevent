@@ -42,6 +42,7 @@ def test_completed_session_is_saved_and_listed(client, headers):
     assert response.json()["traffic_analysis_performed"] is False
     assert response.json()["capture_mode"] == "controlled"
     assert response.json()["indicators"][0]["code"] == "controlled_sample"
+    assert response.json()["sample_quality"] == "adequate"
 
     item = client.get("/api/v1/analysis-sessions", headers=headers).json()["items"][0]
     assert {key: item[key] for key in payload} == payload
@@ -52,6 +53,22 @@ def test_completed_session_is_saved_and_listed(client, headers):
     assert item["captive_portal"] is False
     assert item["capture_mode"] == "controlled"
     assert item["indicators"]
+    assert item["sample_quality"] == "adequate"
+
+
+def test_short_session_reports_insufficient_sample_without_changing_history_data(client, headers):
+    payload = reading() | {
+        "duration_seconds": 3,
+        "received_packets": 2,
+        "transmitted_packets": 1,
+    }
+
+    receipt = client.post("/api/v1/analysis-sessions", json=payload, headers=headers).json()
+    item = client.get("/api/v1/analysis-sessions", headers=headers).json()["items"][0]
+
+    assert receipt["sample_quality"] == "insufficient"
+    assert item["sample_quality"] == "insufficient"
+    assert item["duration_seconds"] == 3
 
 
 def test_analysis_retry_is_idempotent(client, headers):

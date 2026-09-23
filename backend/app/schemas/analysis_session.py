@@ -53,6 +53,7 @@ class AnalysisSessionReceipt(BaseModel):
     traffic_analysis_performed: bool = False
     capture_mode: Literal["controlled", "full"]
     indicators: list[TrafficIndicatorSchema]
+    sample_quality: Literal["insufficient", "limited", "adequate"]
     message: str = "La sesión de análisis se guardó correctamente."
 
 
@@ -90,6 +91,7 @@ class AnalysisSessionItem(BaseModel):
     traffic_analysis_performed: bool = False
     capture_mode: Literal["controlled", "full"] = "controlled"
     indicators: list[TrafficIndicatorSchema] = Field(default_factory=list)
+    sample_quality: Literal["insufficient", "limited", "adequate"] = "insufficient"
 
 
 class AnalysisSessionPage(BaseModel):

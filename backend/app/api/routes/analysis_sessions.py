@@ -16,7 +16,12 @@ from app.schemas.analysis_session import (
     AnalysisSessionReading,
     AnalysisSessionReceipt,
 )
-from app.services import ASSESSMENT_VERSION, evaluate_analysis_risk, evaluate_traffic_indicators
+from app.services import (
+    ASSESSMENT_VERSION,
+    evaluate_analysis_risk,
+    evaluate_sample_quality,
+    evaluate_traffic_indicators,
+)
 
 
 router = APIRouter(prefix="/api/v1/analysis-sessions", tags=["analysis-sessions"])
@@ -95,6 +100,11 @@ def save_analysis_session(
         ipv6_packets=reading.ipv6_packets,
         http_packets=reading.http_packets,
     )
+    sample_quality = evaluate_sample_quality(
+        reading.duration_seconds,
+        reading.received_packets,
+        reading.transmitted_packets,
+    )
     statement = (
         insert(AnalysisSessionRecord)
         .values(
@@ -143,6 +153,7 @@ def save_analysis_session(
         traffic_analysis_performed=row.traffic_analysis_performed,
         capture_mode=row.capture_mode,
         indicators=row.indicators,
+        sample_quality=sample_quality,
     )
 
 
@@ -188,6 +199,17 @@ def analysis_history(
         ).limit(limit + 1)
     ).all()
     return AnalysisSessionPage(
-        items=[AnalysisSessionItem.model_validate(row) for row in rows[:limit]],
+        items=[
+            AnalysisSessionItem.model_validate(row).model_copy(
+                update={
+                    "sample_quality": evaluate_sample_quality(
+                        row.duration_seconds,
+                        row.received_packets,
+                        row.transmitted_packets,
+                    )
+                }
+            )
+            for row in rows[:limit]
+        ],
         next_before=rows[limit - 1].session_id if len(rows) > limit else None,
     )
