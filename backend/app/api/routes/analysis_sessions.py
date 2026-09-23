@@ -98,7 +98,7 @@ def save_analysis_session(
         unparsed_packets=reading.unparsed_packets,
         ipv4_packets=reading.ipv4_packets,
         ipv6_packets=reading.ipv6_packets,
-        http_packets=reading.http_packets,
+        http_packets=reading.http_packets + reading.relay_http_observations,
     )
     sample_quality = evaluate_sample_quality(
         reading.duration_seconds,
@@ -118,7 +118,11 @@ def save_analysis_session(
                 if reading.capture_mode == "full"
                 else "connection_metadata"
             ),
-            assessment_version=ASSESSMENT_VERSION,
+            assessment_version=(
+                ASSESSMENT_VERSION
+                if reading.relay_metrics_collected
+                else "rules-aggregate-v2"
+            ),
             traffic_analysis_performed=reading.capture_mode == "full",
             indicators=[indicator.__dict__ for indicator in indicators],
         )
