@@ -8,6 +8,7 @@ import com.anderson.wifiprevent.data.local.InstallationStore
 import com.anderson.wifiprevent.domain.model.ConnectionReceipt
 import com.anderson.wifiprevent.domain.model.AnalysisReceipt
 import com.anderson.wifiprevent.domain.model.AnalysisHistoryEntry
+import com.anderson.wifiprevent.domain.model.AnalysisHistorySummary
 import com.anderson.wifiprevent.domain.model.AnalysisHistoryPage
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
@@ -220,6 +221,21 @@ class BackendClient(context: Context) {
                 )
             }
             AnalysisHistoryPage(entries, response.nullableString("next_before"))
+        }
+
+    suspend fun analysisHistorySummary(): AnalysisHistorySummary =
+        withContext(Dispatchers.IO) {
+            val response = request("GET", "/api/v1/analysis-sessions/summary")
+            AnalysisHistorySummary(
+                totalSessions = response.getInt("total_sessions"),
+                lowRisk = response.getInt("low_risk"),
+                mediumRisk = response.getInt("medium_risk"),
+                highRisk = response.getInt("high_risk"),
+                unknownRisk = response.getInt("unknown_risk"),
+                notEvaluated = response.getInt("not_evaluated"),
+                controlledSessions = response.getInt("controlled_sessions"),
+                fullSessions = response.getInt("full_sessions")
+            )
         }
 
     private fun isRunningOnEmulator(): Boolean {

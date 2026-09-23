@@ -6,6 +6,7 @@ import com.anderson.wifiprevent.domain.model.HistoryPage
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
 import com.anderson.wifiprevent.domain.model.AnalysisReceipt
 import com.anderson.wifiprevent.domain.model.AnalysisHistoryPage
+import com.anderson.wifiprevent.domain.model.AnalysisHistorySummary
 import com.anderson.wifiprevent.data.local.StoredAnalysisSession
 
 class ConnectionRepository(
@@ -29,5 +30,9 @@ class ConnectionRepository(
 
     suspend fun getAnalysisHistory(before: String? = null): AnalysisHistoryPage {
         return backendClient.analysisHistory(before)
+    }
+
+    suspend fun getAnalysisHistorySummary(): AnalysisHistorySummary {
+        return backendClient.analysisHistorySummary()
     }
 }

@@ -34,6 +34,7 @@ import com.anderson.wifiprevent.domain.model.AnalysisSession
 import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.HistoryEntry
 import com.anderson.wifiprevent.domain.model.AnalysisHistoryEntry
+import com.anderson.wifiprevent.domain.model.AnalysisHistorySummary
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.domain.model.WifiSnapshot
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
@@ -80,6 +81,7 @@ class MainActivity : ComponentActivity() {
     private var historyCursor: String? = null
     private var historyHasMore by mutableStateOf(false)
     private var analysisHistoryEntries by mutableStateOf<List<AnalysisHistoryEntry>>(emptyList())
+    private var analysisHistorySummary by mutableStateOf<AnalysisHistorySummary?>(null)
     private var analysisHistoryLoading by mutableStateOf(false)
     private var analysisHistoryError by mutableStateOf<String?>(null)
     private var analysisHistoryCursor: String? = null
@@ -177,6 +179,7 @@ class MainActivity : ComponentActivity() {
                     when (currentScreen) {
                         AppScreen.ANALYSIS_HISTORY -> AnalysisHistoryScreen(
                             entries = analysisHistoryEntries,
+                            summary = analysisHistorySummary,
                             loading = analysisHistoryLoading,
                             error = analysisHistoryError,
                             hasMore = analysisHistoryHasMore,
@@ -350,6 +353,9 @@ class MainActivity : ComponentActivity() {
         analysisHistoryError = null
         lifecycleScope.launch {
             try {
+                if (!more) {
+                    analysisHistorySummary = connectionRepository.getAnalysisHistorySummary()
+                }
                 val page = connectionRepository.getAnalysisHistory(cursor)
                 analysisHistoryEntries = if (more) {
                     (analysisHistoryEntries + page.entries).distinctBy { it.id }

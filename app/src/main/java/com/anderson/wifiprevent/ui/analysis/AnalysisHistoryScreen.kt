@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.anderson.wifiprevent.domain.model.AnalysisHistoryEntry
+import com.anderson.wifiprevent.domain.model.AnalysisHistorySummary
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
 import com.anderson.wifiprevent.ui.common.formatSecurityType
@@ -31,6 +32,7 @@ import java.util.Locale
 @Composable
 fun AnalysisHistoryScreen(
     entries: List<AnalysisHistoryEntry>,
+    summary: AnalysisHistorySummary?,
     loading: Boolean,
     error: String?,
     hasMore: Boolean,
@@ -58,6 +60,7 @@ fun AnalysisHistoryScreen(
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Actualizar análisis") }
         }
+        summary?.let { value -> item { AnalysisSummaryCard(value) } }
         if (loading) item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
         error?.let { message -> item {
             Text(message, color = MaterialTheme.colorScheme.error)
@@ -73,6 +76,37 @@ fun AnalysisHistoryScreen(
                 enabled = !loading,
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Cargar más") }
+        }
+    }
+}
+
+@Composable
+private fun AnalysisSummaryCard(summary: AnalysisHistorySummary) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                "Resumen de esta instalación",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text("Sesiones registradas: ${summary.totalSessions}")
+            Text(
+                "Riesgo bajo: ${summary.lowRisk} · medio: ${summary.mediumRisk} · " +
+                        "alto: ${summary.highRisk}"
+            )
+            if (summary.unknownRisk > 0 || summary.notEvaluated > 0) {
+                Text(
+                    "Sin información suficiente: ${summary.unknownRisk} · " +
+                            "sin evaluación histórica: ${summary.notEvaluated}"
+                )
+            }
+            Text(
+                "Controladas: ${summary.controlledSessions} · " +
+                        "completas: ${summary.fullSessions}"
+            )
         }
     }
 }
