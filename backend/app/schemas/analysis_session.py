@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class AnalysisSessionReading(BaseModel):
@@ -30,7 +30,32 @@ class AnalysisSessionReading(BaseModel):
     http_packets: int = Field(default=0, ge=0)
     tls_or_quic_packets: int = Field(default=0, ge=0)
     unique_destinations: int = Field(default=0, ge=0)
+    relay_metrics_collected: bool = False
+    relay_tcp_connections: int = Field(default=0, ge=0)
+    relay_udp_datagrams: int = Field(default=0, ge=0)
+    relay_dns_observations: int = Field(default=0, ge=0)
+    relay_http_observations: int = Field(default=0, ge=0)
+    relay_tls_or_quic_observations: int = Field(default=0, ge=0)
+    relay_other_observations: int = Field(default=0, ge=0)
+    relay_unique_destinations: int = Field(default=0, ge=0)
     capture_mode: Literal["controlled", "full"] = "controlled"
+
+    @model_validator(mode="after")
+    def validate_relay_metrics(self):
+        relay_values = (
+            self.relay_tcp_connections,
+            self.relay_udp_datagrams,
+            self.relay_dns_observations,
+            self.relay_http_observations,
+            self.relay_tls_or_quic_observations,
+            self.relay_other_observations,
+            self.relay_unique_destinations,
+        )
+        if self.relay_metrics_collected and self.capture_mode != "full":
+            raise ValueError("relay metrics require full capture mode")
+        if not self.relay_metrics_collected and any(relay_values):
+            raise ValueError("relay observations require relay_metrics_collected")
+        return self
 
 
 class TrafficIndicatorSchema(BaseModel):
@@ -82,6 +107,14 @@ class AnalysisSessionItem(BaseModel):
     http_packets: int = 0
     tls_or_quic_packets: int = 0
     unique_destinations: int = 0
+    relay_metrics_collected: bool = False
+    relay_tcp_connections: int = 0
+    relay_udp_datagrams: int = 0
+    relay_dns_observations: int = 0
+    relay_http_observations: int = 0
+    relay_tls_or_quic_observations: int = 0
+    relay_other_observations: int = 0
+    relay_unique_destinations: int = 0
     risk_level: Literal["low", "medium", "high", "unknown"] | None = None
     risk_reasons: list[str] | None = None
     assessment_scope: Literal[
