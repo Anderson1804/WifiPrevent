@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +20,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,6 +44,7 @@ fun AnalysisHistoryScreen(
     summary: AnalysisHistorySummary?,
     riskFilter: String?,
     captureModeFilter: String?,
+    deletingId: String?,
     loading: Boolean,
     error: String?,
     hasMore: Boolean,
@@ -47,8 +53,37 @@ fun AnalysisHistoryScreen(
     onMore: () -> Unit,
     onRiskFilterChange: (String?) -> Unit,
     onCaptureModeFilterChange: (String?) -> Unit,
+    onDelete: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var pendingDelete by remember { mutableStateOf<AnalysisHistoryEntry?>(null) }
+    pendingDelete?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { if (deletingId == null) pendingDelete = null },
+            title = { Text("Eliminar sesión") },
+            text = {
+                Text(
+                    "Se eliminará permanentemente esta sesión del servidor local. " +
+                            "Esta acción no puede deshacerse."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = deletingId == null,
+                    onClick = {
+                        onDelete(entry.id)
+                        pendingDelete = null
+                    }
+                ) { Text("Eliminar") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = deletingId == null,
+                    onClick = { pendingDelete = null }
+                ) { Text("Cancelar") }
+            }
+        )
+    }
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 24.dp),
         contentPadding = PaddingValues(vertical = 16.dp),
@@ -86,7 +121,14 @@ fun AnalysisHistoryScreen(
             Text("Todavía no hay análisis guardados.", style = MaterialTheme.typography.titleMedium)
             Text("Realiza y detén una sesión para crear el primer registro.")
         }
-        items(entries, key = { it.id }) { entry -> AnalysisHistoryCard(entry) }
+        items(entries, key = { it.id }) { entry ->
+            AnalysisHistoryCard(
+                entry = entry,
+                deleting = deletingId == entry.id,
+                deleteEnabled = deletingId == null && !loading,
+                onDelete = { pendingDelete = entry }
+            )
+        }
         if (hasMore) item {
             OutlinedButton(
                 onClick = onMore,
@@ -179,7 +221,12 @@ private fun AnalysisSummaryCard(summary: AnalysisHistorySummary) {
 }
 
 @Composable
-private fun AnalysisHistoryCard(entry: AnalysisHistoryEntry) {
+private fun AnalysisHistoryCard(
+    entry: AnalysisHistoryEntry,
+    deleting: Boolean,
+    deleteEnabled: Boolean,
+    onDelete: () -> Unit
+) {
     Card(Modifier.fillMaxWidth()) {
         Column(
             Modifier.padding(18.dp),
@@ -224,6 +271,13 @@ private fun AnalysisHistoryCard(entry: AnalysisHistoryEntry) {
             AnalysisMetrics(entry.metrics)
             if (entry.captureMode == "controlled") StoredMetadata(entry.metadata)
             Text("Sesión: ${entry.id}", style = MaterialTheme.typography.bodySmall)
+            TextButton(
+                onClick = onDelete,
+                enabled = deleteEnabled,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (deleting) "Eliminando…" else "Eliminar sesión")
+            }
         }
     }
 }

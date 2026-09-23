@@ -118,6 +118,7 @@ class BackendClient(context: Context) {
             }
             when (val code = connection.responseCode) {
                 200 -> return JSONObject(connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() })
+                204 -> return JSONObject()
                 401 -> error("No se pudo identificar esta instalación. Revisa la versión del backend.")
                 404 -> error("El registro ya no está disponible. Actualiza el historial.")
                 409 -> error("El identificador del envío tiene otros datos. No se guardó un duplicado.")
@@ -247,6 +248,11 @@ class BackendClient(context: Context) {
                 fullSessions = response.getInt("full_sessions")
             )
         }
+
+    suspend fun deleteAnalysis(sessionId: String) = withContext(Dispatchers.IO) {
+        val normalizedId = UUID.fromString(sessionId)
+        request("DELETE", "/api/v1/analysis-sessions/$normalizedId")
+    }
 
     private fun isRunningOnEmulator(): Boolean {
         return Build.FINGERPRINT.startsWith("generic") ||

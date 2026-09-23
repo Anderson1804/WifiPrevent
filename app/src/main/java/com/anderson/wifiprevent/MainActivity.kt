@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
     private var analysisHistorySummary by mutableStateOf<AnalysisHistorySummary?>(null)
     private var analysisHistoryRiskFilter by mutableStateOf<String?>(null)
     private var analysisHistoryModeFilter by mutableStateOf<String?>(null)
+    private var analysisHistoryDeletingId by mutableStateOf<String?>(null)
     private var analysisHistoryLoading by mutableStateOf(false)
     private var analysisHistoryError by mutableStateOf<String?>(null)
     private var analysisHistoryCursor: String? = null
@@ -184,6 +185,7 @@ class MainActivity : ComponentActivity() {
                             summary = analysisHistorySummary,
                             riskFilter = analysisHistoryRiskFilter,
                             captureModeFilter = analysisHistoryModeFilter,
+                            deletingId = analysisHistoryDeletingId,
                             loading = analysisHistoryLoading,
                             error = analysisHistoryError,
                             hasMore = analysisHistoryHasMore,
@@ -204,6 +206,7 @@ class MainActivity : ComponentActivity() {
                                 analysisHistoryHasMore = false
                                 loadAnalysisHistory()
                             },
+                            onDelete = { sessionId -> deleteAnalysisHistoryEntry(sessionId) },
                             modifier = Modifier.padding(padding)
                         )
 
@@ -392,6 +395,33 @@ class MainActivity : ComponentActivity() {
                 analysisHistoryError = e.message ?: "No se pudo consultar el historial de análisis."
             } finally {
                 analysisHistoryLoading = false
+            }
+        }
+    }
+
+    private fun deleteAnalysisHistoryEntry(sessionId: String) {
+        if (analysisHistoryDeletingId != null || analysisHistoryLoading) return
+        analysisHistoryDeletingId = sessionId
+        analysisHistoryError = null
+        lifecycleScope.launch {
+            try {
+                connectionRepository.deleteAnalysis(sessionId)
+                analysisHistoryEntries = analysisHistoryEntries.filterNot { it.id == sessionId }
+                try {
+                    analysisHistorySummary = connectionRepository.getAnalysisHistorySummary()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    analysisHistoryError =
+                        "La sesión se eliminó, pero el resumen no pudo actualizarse. " +
+                                "Pulsa Actualizar análisis."
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                analysisHistoryError = e.message ?: "No se pudo eliminar la sesión."
+            } finally {
+                analysisHistoryDeletingId = null
             }
         }
     }

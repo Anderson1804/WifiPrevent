@@ -39,4 +39,8 @@ class ConnectionRepository(
     suspend fun getAnalysisHistorySummary(): AnalysisHistorySummary {
         return backendClient.analysisHistorySummary()
     }
+
+    suspend fun deleteAnalysis(sessionId: String) {
+        backendClient.deleteAnalysis(sessionId)
+    }
 }
