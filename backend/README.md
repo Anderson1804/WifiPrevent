@@ -118,6 +118,10 @@ DELETE /api/v1/analysis-sessions/{session_id} elimina una sesión únicamente cu
 pertenece a la instalación autenticada. Devuelve 204 sin contenido; para evitar
 confirmar la existencia de datos ajenos, una sesión inexistente o de otra instalación
 devuelve 404.
+Cada sesión nueva guarda `assessment_version=rules-aggregate-v1`, que identifica
+la versión de reglas utilizada para producir su evaluación. La migración marca como
+`legacy` los resultados calculados antes de incorporar este versionado; no vuelve a
+calcular ni altera su nivel de riesgo original.
 
 ## Pruebas
 
