@@ -10,6 +10,8 @@ import android.net.VpnService
 import android.net.IpPrefix
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.Handler
+import android.os.Looper
 import com.anderson.wifiprevent.MainActivity
 import com.anderson.wifiprevent.data.local.AnalysisSessionStore
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataAccumulator
@@ -27,6 +29,23 @@ class TrafficAnalysisService : VpnService() {
     private val sessionStore by lazy { AnalysisSessionStore(this) }
     private var tunnel: ParcelFileDescriptor? = null
     private var readerThread: Thread? = null
+    private val statsHandler = Handler(Looper.getMainLooper())
+    private val statsTick = object : Runnable {
+        override fun run() {
+            if (!capturing || activeMode != CaptureMode.FULL) return
+            val counters = packetForwarder.counters()
+            if (counters == null) {
+                stopControlledCapture()
+                sessionStore.fail()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return
+            }
+            sessionStore.updateTunnelCounters(counters)
+            statsHandler.postDelayed(this, STATS_INTERVAL_MS)
+        }
+    }
+    private var activeMode = CaptureMode.CONTROLLED
     @Volatile private var capturing = false
     private var accumulator = TrafficMetadataAccumulator()
     private val packetForwarder: PacketForwarder by lazy {
@@ -117,11 +136,13 @@ class TrafficAnalysisService : VpnService() {
         val established = builder.establish() ?: return false
         tunnel = established
         capturing = true
+        activeMode = mode
         if (plan.requiresPacketForwarder) {
             if (!packetForwarder.start(established, ::recordPacket)) {
                 stopControlledCapture()
                 return false
             }
+            statsHandler.postDelayed(statsTick, STATS_INTERVAL_MS)
         } else {
             readerThread = Thread({ readPackets(established) }, "wifiprevent-tun-reader").apply {
                 start()
@@ -176,12 +197,17 @@ class TrafficAnalysisService : VpnService() {
     }
 
     private fun stopControlledCapture() {
+        statsHandler.removeCallbacks(statsTick)
+        if (capturing && activeMode == CaptureMode.FULL) {
+            packetForwarder.counters()?.let(sessionStore::updateTunnelCounters)
+        }
         capturing = false
         packetForwarder.stop()
         runCatching { tunnel?.close() }
         tunnel = null
         readerThread?.interrupt()
         readerThread = null
+        activeMode = CaptureMode.CONTROLLED
     }
 
     private fun startAsForeground(networkName: String?) {
@@ -263,5 +289,6 @@ class TrafficAnalysisService : VpnService() {
         private const val NOTIFICATION_ID = 2001
         private const val TUN_ADDRESS = "10.77.0.2"
         private const val FULL_DNS = "1.1.1.1"
+        private const val STATS_INTERVAL_MS = 1_000L
     }
 }
