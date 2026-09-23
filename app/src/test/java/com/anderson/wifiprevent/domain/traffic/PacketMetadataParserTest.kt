@@ -32,6 +32,19 @@ class PacketMetadataParserTest {
     }
 
     @Test
+    fun parsesShortenedNativeHeaderWithoutPayload() {
+        val header = ipv4(protocol = 6, sourcePort = 50_000, destinationPort = 443)
+            .copyOf(24)
+        header[3] = 24
+
+        val result = PacketMetadataParser.parse(header)!!
+
+        assertEquals(TransportProtocol.TCP, result.transportProtocol)
+        assertEquals(443, result.destinationPort)
+        assertEquals(ApplicationHint.TLS_OR_QUIC, result.applicationHint)
+    }
+
+    @Test
     fun parsesIpv6UdpQuic() {
         val result = PacketMetadataParser.parse(ipv6Udp(50_000, 443))!!
 
