@@ -92,12 +92,15 @@ fun AnalysisScreen(
         Text("• Duración de la sesión")
         Text("• Cantidad de paquetes y bytes")
         Text(
-            "Los contadores son agregados del teléfono durante el intervalo; " +
-                    "todavía no identifican aplicaciones ni contenido."
+            "En la validación controlada, los contadores son agregados del teléfono. " +
+                    "En la captura completa, los contadores proceden del túnel VPN."
         )
         Text("La validación de protocolos usa una ruta VPN aislada y tráfico de prueba controlado.")
         Text(
-            "Modo actual: validación controlada",
+            "Modo: " + when (session?.captureMode) {
+                CaptureMode.FULL -> "captura completa experimental"
+                else -> "validación controlada"
+            },
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )

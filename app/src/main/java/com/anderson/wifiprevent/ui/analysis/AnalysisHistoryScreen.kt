@@ -92,6 +92,13 @@ private fun AnalysisHistoryCard(entry: AnalysisHistoryEntry) {
             Text(formatAnalysisDate(entry.receivedAt), style = MaterialTheme.typography.labelLarge)
             Text("Seguridad: ${formatSecurityType(entry.securityType)}")
             Text(
+                "Modo: " + if (entry.captureMode == "full") {
+                    "captura completa experimental"
+                } else {
+                    "validación controlada"
+                }
+            )
+            Text(
                 "Evaluación preliminar: ${formatRiskLevel(entry.riskLevel, entry.assessmentScope != null)}",
                 fontWeight = FontWeight.Bold
             )
@@ -105,13 +112,18 @@ private fun AnalysisHistoryCard(entry: AnalysisHistoryEntry) {
             }
             if (!entry.trafficAnalysisPerformed) {
                 Text(
-                    "Alcance actual: metadatos de conexión y una muestra controlada de " +
-                            "protocolos y destinos. Todavía no representa todo el tráfico.",
+                    if (entry.captureMode == "full") {
+                        "Alcance actual: volumen real del túnel IPv4 y metadatos de conexión. " +
+                                "La clasificación detallada de protocolos está pendiente."
+                    } else {
+                        "Alcance actual: metadatos de conexión y una muestra controlada de " +
+                                "protocolos y destinos. Todavía no representa todo el tráfico."
+                    },
                     style = MaterialTheme.typography.bodySmall
                 )
             }
             AnalysisMetrics(entry.metrics)
-            StoredMetadata(entry.metadata)
+            if (entry.captureMode == "controlled") StoredMetadata(entry.metadata)
             Text("Sesión: ${entry.id}", style = MaterialTheme.typography.bodySmall)
         }
     }
