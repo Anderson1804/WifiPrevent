@@ -24,6 +24,13 @@ class AnalysisSessionRecord(Base):
             "AND unique_destinations >= 0",
             name="ck_analysis_metadata_nonnegative",
         ),
+        CheckConstraint(
+            "relay_tcp_connections >= 0 AND relay_udp_datagrams >= 0 "
+            "AND relay_dns_observations >= 0 AND relay_http_observations >= 0 "
+            "AND relay_tls_or_quic_observations >= 0 AND relay_other_observations >= 0 "
+            "AND relay_unique_destinations >= 0",
+            name="ck_analysis_relay_metadata_nonnegative",
+        ),
     )
 
     session_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
@@ -49,6 +56,14 @@ class AnalysisSessionRecord(Base):
     http_packets: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     tls_or_quic_packets: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     unique_destinations: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    relay_metrics_collected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    relay_tcp_connections: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    relay_udp_datagrams: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    relay_dns_observations: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    relay_http_observations: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    relay_tls_or_quic_observations: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    relay_other_observations: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    relay_unique_destinations: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     risk_level: Mapped[str | None] = mapped_column(String(32))
     risk_reasons: Mapped[list[str] | None] = mapped_column(JSON)
     assessment_scope: Mapped[str | None] = mapped_column(String(32))
