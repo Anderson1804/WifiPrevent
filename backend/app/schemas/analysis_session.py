@@ -48,6 +48,7 @@ class AnalysisSessionReceipt(BaseModel):
     assessment_scope: Literal[
         "connection_metadata", "connection_and_traffic_metadata"
     ] = "connection_metadata"
+    assessment_version: str | None = None
     traffic_analysis_performed: bool = False
     capture_mode: Literal["controlled", "full"]
     indicators: list[TrafficIndicatorSchema]
@@ -83,6 +84,7 @@ class AnalysisSessionItem(BaseModel):
     assessment_scope: Literal[
         "connection_metadata", "connection_and_traffic_metadata"
     ] | None = None
+    assessment_version: str | None = None
     traffic_analysis_performed: bool = False
     capture_mode: Literal["controlled", "full"] = "controlled"
     indicators: list[TrafficIndicatorSchema] = Field(default_factory=list)
