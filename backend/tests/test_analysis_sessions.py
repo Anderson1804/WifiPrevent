@@ -105,6 +105,31 @@ def test_full_capture_mode_is_preserved(client, headers):
     assert item["traffic_analysis_performed"] is True
 
 
+def test_full_capture_preserves_relay_observations(client, headers):
+    payload = reading() | {
+        "capture_mode": "full",
+        "relay_metrics_collected": True,
+        "relay_tcp_connections": 4,
+        "relay_udp_datagrams": 7,
+        "relay_dns_observations": 3,
+        "relay_http_observations": 1,
+        "relay_tls_or_quic_observations": 5,
+        "relay_other_observations": 2,
+        "relay_unique_destinations": 6,
+    }
+
+    response = client.post("/api/v1/analysis-sessions", json=payload, headers=headers)
+    item = client.get("/api/v1/analysis-sessions", headers=headers).json()["items"][0]
+
+    assert response.status_code == 200
+    assert any(value["code"] == "plaintext_http" for value in response.json()["indicators"])
+    assert item["relay_metrics_collected"] is True
+    assert item["relay_tcp_connections"] == 4
+    assert item["relay_udp_datagrams"] == 7
+    assert item["relay_unique_destinations"] == 6
+    assert item["assessment_version"] == "rules-relay-v3"
+
+
 def test_captive_portal_is_preserved_and_explained(client, headers):
     payload = reading() | {"captive_portal": True}
 
@@ -247,6 +272,8 @@ def test_analysis_sessions_are_isolated(client, headers):
         {"transmitted_packets": -1},
         {"parsed_packets": -1},
         {"extra": "unexpected"},
+        {"relay_metrics_collected": True},
+        {"relay_tcp_connections": 1},
     ],
 )
 def test_invalid_analysis_data_is_rejected(client, headers, change):
