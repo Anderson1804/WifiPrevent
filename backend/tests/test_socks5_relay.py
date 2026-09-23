@@ -4,7 +4,8 @@ import threading
 import socketserver
 from functools import partial
 
-from socks5_relay import RelayTrafficMetrics, handle_client
+from socks5_relay import RelayTrafficMetrics, handle_client, handle_control_client
+from uuid import uuid4
 
 
 def receive_exact(connection, size):
@@ -15,6 +16,13 @@ def receive_exact(connection, size):
             raise ConnectionError("connection closed")
         data += part
     return data
+
+
+def receive_http(connection):
+    response = b""
+    while part := connection.recv(4096):
+        response += part
+    return response.split(b"\r\n\r\n", 1)
 
 
 class AsyncServerThread:
@@ -165,3 +173,33 @@ def test_tcp_relay_records_only_a_successful_connection():
             assert receive_exact(connection, 10)[1] == 0
 
     assert metrics.snapshot().tcp_connections == 1
+
+
+def test_control_channel_scopes_snapshot_to_started_session():
+    metrics = RelayTrafficMetrics(fingerprint_key=b"test-key")
+    handler = partial(handle_control_client, metrics=metrics)
+    session_id = uuid4()
+
+    with AsyncServerThread(handler) as control:
+        with socket.create_connection(("127.0.0.1", control.port), timeout=3) as connection:
+            connection.sendall(
+                f"POST /sessions/{session_id}/start HTTP/1.1\r\nHost: localhost\r\n\r\n".encode()
+            )
+            header, _ = receive_http(connection)
+            assert b"201 Created" in header
+
+        metrics.observe("udp", "1.1.1.1", 53)
+        with socket.create_connection(("127.0.0.1", control.port), timeout=3) as connection:
+            connection.sendall(
+                f"GET /sessions/{session_id} HTTP/1.1\r\nHost: localhost\r\n\r\n".encode()
+            )
+            header, body = receive_http(connection)
+            assert b"200 OK" in header
+            assert b'"udp_datagrams":1' in body
+
+        with socket.create_connection(("127.0.0.1", control.port), timeout=3) as connection:
+            connection.sendall(
+                f"GET /sessions/{uuid4()} HTTP/1.1\r\nHost: localhost\r\n\r\n".encode()
+            )
+            header, _ = receive_http(connection)
+            assert b"404 Not Found" in header

@@ -6,9 +6,11 @@ from dataclasses import dataclass
 import hashlib
 import hmac
 import ipaddress
+import json
 import logging
 import secrets
 import socket
+from uuid import UUID
 
 
 LOGGER = logging.getLogger("wifiprevent.socks5")
@@ -38,6 +40,17 @@ class RelayTrafficMetrics:
         self._tls_or_quic_observations = 0
         self._other_observations = 0
         self._destination_fingerprints: set[bytes] = set()
+        self._session_id: str | None = None
+
+    def start_session(self, session_id: str) -> None:
+        self._session_id = str(UUID(session_id))
+        self._tcp_connections = 0
+        self._udp_datagrams = 0
+        self._dns_observations = 0
+        self._http_observations = 0
+        self._tls_or_quic_observations = 0
+        self._other_observations = 0
+        self._destination_fingerprints.clear()
 
     def observe(self, transport: str, host: str, port: int) -> None:
         if transport == "tcp":
@@ -75,8 +88,76 @@ class RelayTrafficMetrics:
             unique_destinations=len(self._destination_fingerprints),
         )
 
+    def session_snapshot(self, session_id: str) -> RelayMetricsSnapshot | None:
+        normalized = str(UUID(session_id))
+        return self.snapshot() if normalized == self._session_id else None
+
 
 RELAY_METRICS = RelayTrafficMetrics()
+CONTROL_HOST = "127.0.0.1"
+CONTROL_PORT = 1081
+
+
+async def send_http_json(
+        writer: asyncio.StreamWriter,
+        status: int,
+        payload: dict,
+) -> None:
+    body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    reason = {200: "OK", 201: "Created", 400: "Bad Request", 404: "Not Found"}[status]
+    writer.write(
+        f"HTTP/1.1 {status} {reason}\r\n"
+        f"Content-Type: application/json\r\n"
+        f"Content-Length: {len(body)}\r\n"
+        "Connection: close\r\n\r\n".encode("ascii") + body
+    )
+    await writer.drain()
+
+
+async def handle_control_client(
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+        metrics: RelayTrafficMetrics = RELAY_METRICS,
+) -> None:
+    try:
+        header = await reader.readuntil(b"\r\n\r\n")
+        if len(header) > 4096:
+            await send_http_json(writer, 400, {"detail": "invalid request"})
+            return
+        request_line = header.split(b"\r\n", 1)[0].decode("ascii")
+        method, path, version = request_line.split(" ")
+        if version != "HTTP/1.1" or not path.startswith("/sessions/"):
+            await send_http_json(writer, 404, {"detail": "not found"})
+            return
+        parts = path.strip("/").split("/")
+        if len(parts) not in (2, 3) or parts[0] != "sessions":
+            await send_http_json(writer, 404, {"detail": "not found"})
+            return
+        session_id = str(UUID(parts[1]))
+        if method == "POST" and parts[2:] == ["start"]:
+            metrics.start_session(session_id)
+            await send_http_json(writer, 201, {"session_id": session_id, "status": "ready"})
+            return
+        if method == "GET" and len(parts) == 2:
+            snapshot = metrics.session_snapshot(session_id)
+            if snapshot is None:
+                await send_http_json(writer, 404, {"detail": "session not active"})
+                return
+            await send_http_json(
+                writer,
+                200,
+                {"session_id": session_id, **snapshot.__dict__},
+            )
+            return
+        await send_http_json(writer, 404, {"detail": "not found"})
+    except (ValueError, UnicodeError, asyncio.IncompleteReadError, asyncio.LimitOverrunError):
+        await send_http_json(writer, 400, {"detail": "invalid request"})
+    finally:
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except ConnectionError:
+            pass
 
 
 async def read_destination(reader: asyncio.StreamReader, address_type: int) -> str:
@@ -265,10 +346,14 @@ async def handle_client(
 
 async def serve(host: str, port: int) -> None:
     server = await asyncio.start_server(handle_client, host, port)
+    control_server = await asyncio.start_server(
+        handle_control_client, CONTROL_HOST, CONTROL_PORT
+    )
     addresses = ", ".join(str(sock.getsockname()) for sock in server.sockets or [])
     LOGGER.info("Relé SOCKS5 activo en %s", addresses)
-    async with server:
-        await server.serve_forever()
+    LOGGER.info("Control de métricas activo en %s:%s", CONTROL_HOST, CONTROL_PORT)
+    async with server, control_server:
+        await asyncio.gather(server.serve_forever(), control_server.serve_forever())
 
 
 def main() -> None:
