@@ -8,6 +8,7 @@ def reading(session_id=None):
         "session_id": str(session_id or uuid4()),
         "ssid": "AndroidWifi",
         "security_type": "WPA3_SAE",
+        "captive_portal": False,
         "duration_seconds": 86,
         "received_bytes": 38287,
         "transmitted_bytes": 5816,
@@ -37,7 +38,7 @@ def test_completed_session_is_saved_and_listed(client, headers):
     assert response.json()["risk_level"] == "low"
     assert response.json()["risk_reasons"]
     assert response.json()["assessment_scope"] == "connection_metadata"
-    assert response.json()["assessment_version"] == "rules-aggregate-v1"
+    assert response.json()["assessment_version"] == "rules-aggregate-v2"
     assert response.json()["traffic_analysis_performed"] is False
     assert response.json()["capture_mode"] == "controlled"
     assert response.json()["indicators"][0]["code"] == "controlled_sample"
@@ -47,7 +48,8 @@ def test_completed_session_is_saved_and_listed(client, headers):
     assert item["received_at"].endswith("Z")
     assert item["risk_level"] == "low"
     assert item["assessment_scope"] == "connection_metadata"
-    assert item["assessment_version"] == "rules-aggregate-v1"
+    assert item["assessment_version"] == "rules-aggregate-v2"
+    assert item["captive_portal"] is False
     assert item["capture_mode"] == "controlled"
     assert item["indicators"]
 
@@ -84,6 +86,17 @@ def test_full_capture_mode_is_preserved(client, headers):
     assert item["capture_mode"] == "full"
     assert item["assessment_scope"] == "connection_and_traffic_metadata"
     assert item["traffic_analysis_performed"] is True
+
+
+def test_captive_portal_is_preserved_and_explained(client, headers):
+    payload = reading() | {"captive_portal": True}
+
+    response = client.post("/api/v1/analysis-sessions", json=payload, headers=headers)
+
+    assert response.status_code == 200
+    assert any("portal cautivo" in reason for reason in response.json()["risk_reasons"])
+    item = client.get("/api/v1/analysis-sessions", headers=headers).json()["items"][0]
+    assert item["captive_portal"] is True
 
 
 def test_analysis_summary_counts_only_the_current_installation(client, headers):

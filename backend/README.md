@@ -118,10 +118,15 @@ DELETE /api/v1/analysis-sessions/{session_id} elimina una sesión únicamente cu
 pertenece a la instalación autenticada. Devuelve 204 sin contenido; para evitar
 confirmar la existencia de datos ajenos, una sesión inexistente o de otra instalación
 devuelve 404.
-Cada sesión nueva guarda `assessment_version=rules-aggregate-v1`, que identifica
-la versión de reglas utilizada para producir su evaluación. La migración marca como
-`legacy` los resultados calculados antes de incorporar este versionado; no vuelve a
-calcular ni altera su nivel de riesgo original.
+Cada sesión guarda `assessment_version`, que identifica la versión de reglas utilizada
+para producir su evaluación. La migración marca como `legacy` los resultados calculados
+antes de incorporar este versionado; no vuelve a calcular ni altera su nivel original.
+Las sesiones que incorporan la señal de portal cautivo usan `rules-aggregate-v2`.
+Las sesiones `v1` permanecen sin cambios.
+Las sesiones nuevas también guardan `captive_portal`, tomado del estado de red que
+Android informa al iniciar la captura. La evaluación lo describe como una condición
+que requiere autenticación y no como prueba de que la red sea maliciosa. Los registros
+anteriores conservan `null` para distinguirlos de una detección negativa real.
 
 ## Pruebas
 

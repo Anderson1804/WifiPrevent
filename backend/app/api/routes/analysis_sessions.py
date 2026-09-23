@@ -74,6 +74,7 @@ def save_analysis_session(
     values = reading.model_dump()
     assessment = evaluate_analysis_risk(
         security_type=reading.security_type,
+        captive_portal=reading.captive_portal,
         capture_mode=reading.capture_mode,
         duration_seconds=reading.duration_seconds,
         received_bytes=reading.received_bytes,

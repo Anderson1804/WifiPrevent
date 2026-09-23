@@ -31,6 +31,7 @@ class AnalysisSessionRecord(Base):
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ssid: Mapped[str | None] = mapped_column(String(128))
     security_type: Mapped[str | None] = mapped_column(String(32))
+    captive_portal: Mapped[bool | None] = mapped_column(Boolean)
     duration_seconds: Mapped[int] = mapped_column(BigInteger, nullable=False)
     received_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     transmitted_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)

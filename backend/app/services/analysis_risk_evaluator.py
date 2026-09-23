@@ -2,11 +2,12 @@ from app.services.risk_evaluator import RiskAssessment, evaluate_risk
 from app.services.traffic_indicator_evaluator import is_outbound_volume_dominant
 
 
-ASSESSMENT_VERSION = "rules-aggregate-v1"
+ASSESSMENT_VERSION = "rules-aggregate-v2"
 
 
 def evaluate_analysis_risk(
         security_type: str | None,
+        captive_portal: bool | None,
         capture_mode: str,
         duration_seconds: int,
         received_bytes: int,
@@ -26,7 +27,7 @@ def evaluate_analysis_risk(
 
     connection_assessment = evaluate_risk(
         security_type=security_type,
-        captive_portal=False,
+        captive_portal=captive_portal is True,
     )
     if capture_mode == "controlled":
         return RiskAssessment(

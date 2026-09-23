@@ -12,6 +12,7 @@ class AnalysisSessionReading(BaseModel):
     session_id: UUID = Field(strict=False)
     ssid: str | None = Field(default=None, max_length=128)
     security_type: str | None = Field(default=None, max_length=32)
+    captive_portal: bool | None = None
     duration_seconds: int = Field(ge=0, le=86_400)
     received_bytes: int = Field(ge=0)
     transmitted_bytes: int = Field(ge=0)
@@ -62,6 +63,7 @@ class AnalysisSessionItem(BaseModel):
     received_at: datetime
     ssid: str | None
     security_type: str | None
+    captive_portal: bool | None = None
     duration_seconds: int
     received_bytes: int
     transmitted_bytes: int
