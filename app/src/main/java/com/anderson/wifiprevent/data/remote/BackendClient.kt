@@ -174,6 +174,7 @@ class BackendClient(context: Context) {
                 riskLevel = reply.nullableString("risk_level"),
                 riskReasons = reply.stringList("risk_reasons"),
                 assessmentScope = reply.nullableString("assessment_scope"),
+                assessmentVersion = reply.nullableString("assessment_version"),
                 trafficAnalysisPerformed = reply.getBoolean("traffic_analysis_performed"),
                 captureMode = reply.getString("capture_mode"),
                 indicators = reply.indicators("indicators")
@@ -226,6 +227,7 @@ class BackendClient(context: Context) {
                     riskLevel = row.nullableString("risk_level"),
                     riskReasons = row.stringList("risk_reasons"),
                     assessmentScope = row.nullableString("assessment_scope"),
+                    assessmentVersion = row.nullableString("assessment_version"),
                     trafficAnalysisPerformed = row.getBoolean("traffic_analysis_performed"),
                     captureMode = row.getString("capture_mode"),
                     indicators = row.indicators("indicators")
