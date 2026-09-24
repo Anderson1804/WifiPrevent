@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 from dataclasses import dataclass
+from functools import partial
 import hashlib
 import hmac
 import ipaddress
@@ -96,6 +97,7 @@ class RelayTrafficMetrics:
 RELAY_METRICS = RelayTrafficMetrics()
 CONTROL_HOST = "127.0.0.1"
 CONTROL_PORT = 1081
+UDP_RELAY_PORT = 1081
 
 
 async def send_http_json(
@@ -271,9 +273,13 @@ async def handle_client(
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
         metrics: RelayTrafficMetrics = RELAY_METRICS,
+        allowed_client_hosts: frozenset[str] | None = None,
 ) -> None:
     upstream_writer = None
     try:
+        peer_host = writer.get_extra_info("peername")[0]
+        if allowed_client_hosts is not None and peer_host not in allowed_client_hosts:
+            return
         version, method_count = await reader.readexactly(2)
         methods = await reader.readexactly(method_count)
         if version != SOCKS_VERSION or 0 not in methods:
@@ -300,9 +306,10 @@ async def handle_client(
         if command == 3:
             loop = asyncio.get_running_loop()
             client_host = writer.get_extra_info("peername")[0]
+            local_host = writer.get_extra_info("sockname")[0]
             transport, _ = await loop.create_datagram_endpoint(
                 lambda: UdpAssociation(client_host, metrics),
-                local_addr=("127.0.0.1", 0),
+                local_addr=(local_host, UDP_RELAY_PORT),
             )
             try:
                 await send_reply(writer, 0, transport.get_extra_info("sockname"))
@@ -344,8 +351,13 @@ async def handle_client(
             pass
 
 
-async def serve(host: str, port: int) -> None:
-    server = await asyncio.start_server(handle_client, host, port)
+async def serve(
+        host: str,
+        port: int,
+        allowed_client_hosts: frozenset[str] | None = None,
+) -> None:
+    handler = partial(handle_client, allowed_client_hosts=allowed_client_hosts)
+    server = await asyncio.start_server(handler, host, port)
     control_server = await asyncio.start_server(
         handle_control_client, CONTROL_HOST, CONTROL_PORT
     )
@@ -360,10 +372,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="WiFiPrevent local SOCKS5 relay")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=1080)
+    parser.add_argument("--allowed-client", action="append", default=[])
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     try:
-        asyncio.run(serve(args.host, args.port))
+        allowed_clients = frozenset({"127.0.0.1", "::1", *args.allowed_client})
+        asyncio.run(serve(args.host, args.port, allowed_clients))
     except KeyboardInterrupt:
         pass
 

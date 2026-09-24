@@ -1,5 +1,6 @@
 """Manage WiFiPrevent's local PostgreSQL and API processes on Windows."""
 import argparse
+import ipaddress
 import json
 from pathlib import Path
 import re
@@ -14,6 +15,23 @@ ROOT = Path(__file__).resolve().parent
 LOCAL = ROOT / ".local"
 API_PID_FILE = LOCAL / "api.pid"
 SOCKS_PID_FILE = LOCAL / "socks5.pid"
+PHONE_ACCESS_FILE = LOCAL / "phone-access.json"
+
+
+def configured_phone_ip():
+    if not PHONE_ACCESS_FILE.exists():
+        return None
+    try:
+        config = json.loads(PHONE_ACCESS_FILE.read_text(encoding="utf-8-sig"))
+        address = ipaddress.ip_address(config["phone_ip"])
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            "La configuración del teléfono no es válida. Ejecuta nuevamente "
+            "configure_phone_access.ps1 Add -PhoneIp <IP>."
+        ) from exc
+    if address.version != 4 or not address.is_private:
+        raise RuntimeError("La dirección del teléfono debe ser una IPv4 privada.")
+    return str(address)
 
 def db_ready():
     try:
@@ -70,8 +88,14 @@ def socks_ready():
 def start_socks():
     if socks_ready(): return
     with (ROOT / "socks5-relay.log").open("ab") as out, (ROOT / "socks5-relay-error.log").open("ab") as err:
+        command = [
+            sys.executable, "socks5_relay.py", "--host", "0.0.0.0", "--port", "1080"
+        ]
+        phone_ip = configured_phone_ip()
+        if phone_ip is not None:
+            command.extend(["--allowed-client", phone_ip])
         child=subprocess.Popen(
-            [sys.executable, "socks5_relay.py", "--host", "127.0.0.1", "--port", "1080"],
+            command,
             cwd=ROOT, stdout=out, stderr=err, stdin=subprocess.DEVNULL,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )

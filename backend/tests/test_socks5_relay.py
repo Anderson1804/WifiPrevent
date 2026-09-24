@@ -122,6 +122,7 @@ def test_udp_associate_relays_datagrams_without_storing_payload():
                     reply = receive_exact(control, 10)
                     assert reply[1] == 0
                     relay_port = int.from_bytes(reply[-2:], "big")
+                    assert relay_port == 1081
                     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
                         udp.settimeout(3)
                         payload = b"wifiprevent udp test"
@@ -203,3 +204,19 @@ def test_control_channel_scopes_snapshot_to_started_session():
             )
             header, _ = receive_http(connection)
             assert b"404 Not Found" in header
+
+
+def test_relay_rejects_client_outside_allowlist():
+    handler = partial(
+        handle_client,
+        allowed_client_hosts=frozenset({"192.0.2.50"}),
+    )
+
+    with AsyncServerThread(handler) as relay:
+        with socket.create_connection(("127.0.0.1", relay.port), timeout=3) as connection:
+            connection.sendall(b"\x05\x01\x00")
+            try:
+                response = connection.recv(2)
+                assert response == b""
+            except (ConnectionError, OSError):
+                pass
