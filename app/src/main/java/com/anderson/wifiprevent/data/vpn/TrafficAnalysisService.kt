@@ -132,7 +132,7 @@ class TrafficAnalysisService : VpnService() {
             builder
                 .addDnsServer(FULL_DNS)
                 .excludeRoute(
-                    IpPrefix(InetAddress.getByName(SocksRelayProbe.EMULATOR_HOST), 32)
+                    IpPrefix(InetAddress.getByName(developmentRelayHost()), 32)
                 )
         }
         val established = builder.establish() ?: return false

@@ -175,11 +175,19 @@ fun AnalysisScreen(
                         )
                         AnalysisSessionState.ANALYZING -> {
                             MetricsContent(metrics, final = false)
-                            MetadataContent(metadata, session.captureMode)
+                            if (session.captureMode == CaptureMode.CONTROLLED) {
+                                MetadataContent(metadata)
+                            } else {
+                                FullCaptureMetadataNotice(completed = false)
+                            }
                         }
                         AnalysisSessionState.COMPLETED -> {
                             MetricsContent(metrics, final = true)
-                            MetadataContent(metadata, session.captureMode)
+                            if (session.captureMode == CaptureMode.CONTROLLED) {
+                                MetadataContent(metadata)
+                            } else {
+                                FullCaptureMetadataNotice(completed = true)
+                            }
                             Text("La sesión terminó sin almacenar contenido de tráfico.")
                             uploadMessage?.let {
                                 Text(
@@ -267,7 +275,7 @@ private fun MetricsContent(metrics: TrafficMetrics, final: Boolean) {
 }
 
 @Composable
-private fun MetadataContent(metadata: TrafficMetadataSummary, captureMode: CaptureMode) {
+private fun MetadataContent(metadata: TrafficMetadataSummary) {
     Text(
         "Metadatos interpretados",
         style = MaterialTheme.typography.titleMedium,
@@ -285,11 +293,26 @@ private fun MetadataContent(metadata: TrafficMetadataSummary, captureMode: Captu
         Text("Paquetes no interpretados: ${metadata.unparsedPackets}")
     }
     Text(
-        if (captureMode == CaptureMode.CONTROLLED) {
-            "Estos valores provienen de paquetes controlados de validación."
+        "Estos valores provienen de paquetes controlados de validación.",
+        style = MaterialTheme.typography.bodySmall
+    )
+}
+
+@Composable
+private fun FullCaptureMetadataNotice(completed: Boolean) {
+    Text(
+        "Observaciones de la captura completa",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold
+    )
+    Text(
+        if (completed) {
+            "Las conexiones TCP, los datagramas UDP y las categorías DNS, HTTP y " +
+                    "TLS/QUIC se consolidan de forma privada al guardar la sesión. " +
+                    "Puedes consultarlas en el historial de análisis."
         } else {
-            "El motor nativo reenvía el tráfico completo; la clasificación detallada de " +
-                    "protocolos todavía está en desarrollo."
+            "El túnel muestra aquí volumen y paquetes en tiempo real. Las observaciones " +
+                    "del relé se consolidarán cuando detengas y guardes la sesión."
         },
         style = MaterialTheme.typography.bodySmall
     )

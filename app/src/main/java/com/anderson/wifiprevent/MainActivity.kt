@@ -30,6 +30,7 @@ import com.anderson.wifiprevent.data.local.AnalysisSessionStore
 import com.anderson.wifiprevent.data.vpn.TrafficAnalysisService
 import com.anderson.wifiprevent.data.vpn.SocksRelayProbe
 import com.anderson.wifiprevent.data.vpn.SocksRelayStatus
+import com.anderson.wifiprevent.data.vpn.developmentRelayHost
 import com.anderson.wifiprevent.domain.model.AnalysisSession
 import com.anderson.wifiprevent.domain.model.AnalysisSessionState
 import com.anderson.wifiprevent.domain.model.HistoryEntry
@@ -104,7 +105,7 @@ class MainActivity : ComponentActivity() {
     private var analysisUploadError by mutableStateOf(false)
     private var relayStatus by mutableStateOf<SocksRelayStatus?>(null)
     private var checkingRelay by mutableStateOf(false)
-    private val socksRelayProbe = SocksRelayProbe()
+    private val socksRelayProbe = SocksRelayProbe(developmentRelayHost())
 
     private val connectionRepository by lazy {
         ConnectionRepository(

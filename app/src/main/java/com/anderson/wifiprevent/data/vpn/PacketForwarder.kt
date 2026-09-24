@@ -43,7 +43,7 @@ class PendingPacketForwarder : PacketForwarder {
 
 class HevPacketForwarder(
     private val context: Context,
-    private val config: HevTunnelConfig = HevTunnelConfig()
+    private val config: HevTunnelConfig? = null
 ) : PacketForwarder {
     override val available: Boolean
         get() = runCatching { TProxyService.TProxyIsRunning() }.isSuccess
@@ -58,7 +58,8 @@ class HevPacketForwarder(
         onPacketObserved: (ByteArray) -> Unit
     ): Boolean {
         if (!available || TProxyService.TProxyIsRunning()) return false
-        val configFile = config.writeTo(context.filesDir)
+        val activeConfig = config ?: HevTunnelConfig(socksHost = developmentRelayHost())
+        val configFile = activeConfig.writeTo(context.filesDir)
         return runCatching {
             TProxyService.TProxyStartService(configFile.absolutePath, tunnel.fd)
         }.getOrDefault(false)
