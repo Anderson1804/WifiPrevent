@@ -22,8 +22,10 @@ desde el emulador y desde un teléfono conectado a la misma red privada. El emul
 usa 10.0.2.2 y el teléfono usa la dirección configurada como `LOCAL_BACKEND_HOST`
 en `app/build.gradle.kts`. Esta conexión HTTP solo está habilitada en compilaciones debug.
 
-El relé SOCKS5 de desarrollo escucha únicamente en `127.0.0.1:1080`; el emulador
-puede alcanzarlo mediante `10.0.2.2:1080`. En esta etapa admite conexiones TCP y
+El relé SOCKS5 de desarrollo escucha en `0.0.0.0:1080`; Windows bloquea el acceso
+externo hasta instalar las reglas específicas. El emulador lo alcanza mediante
+`10.0.2.2:1080` y el teléfono mediante la IP privada configurada en
+`LOCAL_BACKEND_HOST`. En esta etapa admite conexiones TCP y
 no almacena el contenido reenviado ni registra los destinos. La pantalla de análisis
 permite comprobar la negociación SOCKS5 desde el emulador. El relé acepta TCP y
 `UDP ASSOCIATE`, necesario para reenviar consultas DNS del túnel. Su disponibilidad
@@ -60,14 +62,20 @@ por sí solas una amenaza. La clasificación detallada de protocolos permanece
 pendiente y el nivel de riesgo todavía se calcula a partir de los metadatos de
 conexión Wi-Fi.
 
-Para habilitar el acceso del teléfono, abrir PowerShell como administrador y ejecutar:
+Para habilitar el acceso del teléfono, primero consultar su dirección IP en los detalles
+de la red Wi-Fi. Después abrir PowerShell como administrador y ejecutar, reemplazando el
+ejemplo por esa dirección:
 
 ```powershell
-.\backend\configure_phone_access.ps1 Add
+.\backend\configure_phone_access.ps1 Add -PhoneIp 192.168.18.50
 ```
 
-La regla se limita al ejecutable Python de este proyecto, al puerto TCP 8001 y al
-perfil de red privada. Puede comprobarse con `Status` y retirarse con `Remove`.
+Las reglas se limitan al ejecutable Python de este proyecto y al perfil de red privada.
+La API usa 8001/TCP; SOCKS5 usa 1080/TCP y la asociación UDP usa el puerto fijo
+1081/UDP. Los dos puertos del relé aceptan únicamente la IP indicada del teléfono.
+La dirección también se guarda en `.local/phone-access.json`, archivo excluido de Git,
+para que el propio relé rechace otros clientes. Reiniciar los servicios después de
+`Add`. Puede comprobarse con `Status` y retirarse con `Remove`.
 
 ## Probar en Android
 
