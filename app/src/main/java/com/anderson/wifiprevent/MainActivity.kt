@@ -622,6 +622,22 @@ class MainActivity : ComponentActivity() {
                     append("Evaluación preliminar: ${formatRiskLevel(receipt.riskLevel, true)}")
                     append("\nMétodo: ${formatAssessmentVersion(receipt.assessmentVersion)}")
                     append("\nCalidad de la muestra: ${formatSampleQuality(receipt.sampleQuality)}")
+                    if (receipt.relayMetricsCollected) {
+                        append("\nObservaciones del relé:")
+                        append(
+                            "\nTCP: ${receipt.relayMetrics.tcpConnections} conexiones · " +
+                                    "UDP: ${receipt.relayMetrics.udpDatagrams} datagramas"
+                        )
+                        append(
+                            "\nDNS: ${receipt.relayMetrics.dnsObservations} · " +
+                                    "HTTP: ${receipt.relayMetrics.httpObservations} · " +
+                                    "TLS/QUIC: ${receipt.relayMetrics.tlsOrQuicObservations}"
+                        )
+                        append(
+                            "\nOtros: ${receipt.relayMetrics.otherObservations} · " +
+                                    "destinos únicos: ${receipt.relayMetrics.uniqueDestinations}"
+                        )
+                    }
                     if (reasons.isNotBlank()) append("\n$reasons")
                     if (!receipt.trafficAnalysisPerformed) {
                         append("\nLa muestra de protocolos es controlada; la captura completa está pendiente.")

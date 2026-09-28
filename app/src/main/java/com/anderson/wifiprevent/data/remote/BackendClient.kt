@@ -199,7 +199,17 @@ class BackendClient(context: Context) {
                 trafficAnalysisPerformed = reply.getBoolean("traffic_analysis_performed"),
                 captureMode = reply.getString("capture_mode"),
                 indicators = reply.indicators("indicators"),
-                sampleQuality = reply.getString("sample_quality")
+                sampleQuality = reply.getString("sample_quality"),
+                relayMetricsCollected = reply.getBoolean("relay_metrics_collected"),
+                relayMetrics = RelayCaptureMetrics(
+                    tcpConnections = reply.getLong("relay_tcp_connections"),
+                    udpDatagrams = reply.getLong("relay_udp_datagrams"),
+                    dnsObservations = reply.getLong("relay_dns_observations"),
+                    httpObservations = reply.getLong("relay_http_observations"),
+                    tlsOrQuicObservations = reply.getLong("relay_tls_or_quic_observations"),
+                    otherObservations = reply.getLong("relay_other_observations"),
+                    uniqueDestinations = reply.getInt("relay_unique_destinations")
+                )
             )
         }
 
