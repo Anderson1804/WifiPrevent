@@ -21,6 +21,7 @@ from app.services import (
     evaluate_analysis_risk,
     evaluate_sample_quality,
     evaluate_traffic_indicators,
+    recommend_preventive_actions,
 )
 
 
@@ -105,6 +106,13 @@ def save_analysis_session(
         reading.received_packets,
         reading.transmitted_packets,
     )
+    recommendations = recommend_preventive_actions(
+        assessment.level,
+        reading.security_type,
+        reading.captive_portal,
+        sample_quality,
+        (indicator.code for indicator in indicators),
+    )
     statement = (
         insert(AnalysisSessionRecord)
         .values(
@@ -158,6 +166,7 @@ def save_analysis_session(
         capture_mode=row.capture_mode,
         indicators=row.indicators,
         sample_quality=sample_quality,
+        recommendations=list(recommendations),
         relay_metrics_collected=row.relay_metrics_collected,
         relay_tcp_connections=row.relay_tcp_connections,
         relay_udp_datagrams=row.relay_udp_datagrams,
@@ -212,16 +221,28 @@ def analysis_history(
     ).all()
     return AnalysisSessionPage(
         items=[
-            AnalysisSessionItem.model_validate(row).model_copy(
-                update={
-                    "sample_quality": evaluate_sample_quality(
-                        row.duration_seconds,
-                        row.received_packets,
-                        row.transmitted_packets,
-                    )
-                }
-            )
+            _analysis_item(row)
             for row in rows[:limit]
         ],
         next_before=rows[limit - 1].session_id if len(rows) > limit else None,
     )
+
+
+def _analysis_item(row: AnalysisSessionRecord) -> AnalysisSessionItem:
+    sample_quality = evaluate_sample_quality(
+        row.duration_seconds,
+        row.received_packets,
+        row.transmitted_packets,
+    )
+    indicators = row.indicators or []
+    recommendations = recommend_preventive_actions(
+        row.risk_level,
+        row.security_type,
+        row.captive_portal,
+        sample_quality,
+        (indicator.get("code", "") for indicator in indicators),
+    )
+    return AnalysisSessionItem.model_validate(row).model_copy(update={
+        "sample_quality": sample_quality,
+        "recommendations": list(recommendations),
+    })

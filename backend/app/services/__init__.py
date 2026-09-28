@@ -12,6 +12,7 @@ from app.services.sample_quality_evaluator import (
     SampleQuality,
     evaluate_sample_quality,
 )
+from app.services.prevention_recommender import recommend_preventive_actions
 
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "evaluate_risk",
     "SampleQuality",
     "evaluate_sample_quality",
+    "recommend_preventive_actions",
 ]

@@ -90,6 +90,7 @@ class AnalysisSessionReceipt(BaseModel):
     capture_mode: Literal["controlled", "full"]
     indicators: list[TrafficIndicatorSchema]
     sample_quality: Literal["insufficient", "limited", "adequate"]
+    recommendations: list[str] = Field(default_factory=list)
     relay_metrics_collected: bool = False
     relay_tcp_connections: int = 0
     relay_udp_datagrams: int = 0
@@ -144,6 +145,7 @@ class AnalysisSessionItem(BaseModel):
     capture_mode: Literal["controlled", "full"] = "controlled"
     indicators: list[TrafficIndicatorSchema] = Field(default_factory=list)
     sample_quality: Literal["insufficient", "limited", "adequate"] = "insufficient"
+    recommendations: list[str] = Field(default_factory=list)
 
 
 class AnalysisSessionPage(BaseModel):

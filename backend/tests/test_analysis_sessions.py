@@ -43,6 +43,9 @@ def test_completed_session_is_saved_and_listed(client, headers):
     assert response.json()["capture_mode"] == "controlled"
     assert response.json()["indicators"][0]["code"] == "controlled_sample"
     assert response.json()["sample_quality"] == "adequate"
+    assert response.json()["recommendations"] == [
+        "Mantén el sistema actualizado y confirma que los sitios utilizados conserven HTTPS."
+    ]
 
     item = client.get("/api/v1/analysis-sessions", headers=headers).json()["items"][0]
     assert {key: item[key] for key in payload} == payload
@@ -54,6 +57,7 @@ def test_completed_session_is_saved_and_listed(client, headers):
     assert item["capture_mode"] == "controlled"
     assert item["indicators"]
     assert item["sample_quality"] == "adequate"
+    assert item["recommendations"] == response.json()["recommendations"]
 
 
 def test_short_session_reports_insufficient_sample_without_changing_history_data(client, headers):
@@ -69,6 +73,7 @@ def test_short_session_reports_insufficient_sample_without_changing_history_data
     assert receipt["sample_quality"] == "insufficient"
     assert item["sample_quality"] == "insufficient"
     assert item["duration_seconds"] == 3
+    assert receipt["recommendations"][0].startswith("Repite el análisis")
 
 
 def test_analysis_retry_is_idempotent(client, headers):
@@ -132,6 +137,7 @@ def test_full_capture_preserves_relay_observations(client, headers):
     assert item["relay_udp_datagrams"] == 7
     assert item["relay_unique_destinations"] == 6
     assert item["assessment_version"] == "rules-relay-v3"
+    assert any("HTTPS" in value for value in response.json()["recommendations"])
 
 
 def test_captive_portal_is_preserved_and_explained(client, headers):

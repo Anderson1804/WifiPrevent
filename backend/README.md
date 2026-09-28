@@ -123,6 +123,10 @@ alcance de la evaluación. En modo `full`, el riesgo combina la seguridad inform
 por Android con señales agregadas del túnel; un volumen de salida predominante puede
 elevar una evaluación baja a media para revisión. La clasificación actual usa reglas
 explícitas y todavía no utiliza aprendizaje automático.
+Las respuestas de guardado y del historial incluyen `recommendations`, una lista de
+acciones preventivas calculada a partir del nivel, la calidad de muestra, la seguridad
+de la red, el portal cautivo y los indicadores. Estas recomendaciones orientan al
+usuario y no presentan los metadatos como confirmación de una amenaza.
 GET /api/v1/analysis-sessions/summary devuelve los totales de sesiones por nivel
 de riesgo y modo de captura para la instalación autenticada. Incluye por separado
 los registros sin información suficiente y los registros históricos no evaluados.
