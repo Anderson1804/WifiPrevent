@@ -155,6 +155,10 @@ alcanzan cinco segundos y diez paquetes, `limited` antes de treinta segundos o c
 paquetes, y `adequate` cuando se cumplen ambos umbrales. Describe la cobertura de la
 muestra y no modifica por sí mismo el nivel de riesgo. Se calcula también para datos
 históricos, por lo que no necesita una nueva columna ni una migración.
+El recibo de una sesión devuelve también las observaciones agregadas del relé. Android
+puede mostrarlas inmediatamente después del guardado y el historial conserva los mismos
+valores. El servidor exige que la suma de las categorías coincida con las observaciones
+TCP y UDP, y que los destinos únicos no superen el total observado.
 
 ## Pruebas
 

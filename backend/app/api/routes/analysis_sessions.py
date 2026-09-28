@@ -158,6 +158,14 @@ def save_analysis_session(
         capture_mode=row.capture_mode,
         indicators=row.indicators,
         sample_quality=sample_quality,
+        relay_metrics_collected=row.relay_metrics_collected,
+        relay_tcp_connections=row.relay_tcp_connections,
+        relay_udp_datagrams=row.relay_udp_datagrams,
+        relay_dns_observations=row.relay_dns_observations,
+        relay_http_observations=row.relay_http_observations,
+        relay_tls_or_quic_observations=row.relay_tls_or_quic_observations,
+        relay_other_observations=row.relay_other_observations,
+        relay_unique_destinations=row.relay_unique_destinations,
     )
 
 

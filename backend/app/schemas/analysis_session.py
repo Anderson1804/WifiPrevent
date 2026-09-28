@@ -55,6 +55,17 @@ class AnalysisSessionReading(BaseModel):
             raise ValueError("relay metrics require full capture mode")
         if not self.relay_metrics_collected and any(relay_values):
             raise ValueError("relay observations require relay_metrics_collected")
+        relay_total = self.relay_tcp_connections + self.relay_udp_datagrams
+        categorized_total = (
+            self.relay_dns_observations
+            + self.relay_http_observations
+            + self.relay_tls_or_quic_observations
+            + self.relay_other_observations
+        )
+        if self.relay_metrics_collected and relay_total != categorized_total:
+            raise ValueError("relay category totals must match transport observations")
+        if self.relay_unique_destinations > relay_total:
+            raise ValueError("unique relay destinations cannot exceed observations")
         return self
 
 
@@ -79,6 +90,14 @@ class AnalysisSessionReceipt(BaseModel):
     capture_mode: Literal["controlled", "full"]
     indicators: list[TrafficIndicatorSchema]
     sample_quality: Literal["insufficient", "limited", "adequate"]
+    relay_metrics_collected: bool = False
+    relay_tcp_connections: int = 0
+    relay_udp_datagrams: int = 0
+    relay_dns_observations: int = 0
+    relay_http_observations: int = 0
+    relay_tls_or_quic_observations: int = 0
+    relay_other_observations: int = 0
+    relay_unique_destinations: int = 0
     message: str = "La sesión de análisis se guardó correctamente."
 
 

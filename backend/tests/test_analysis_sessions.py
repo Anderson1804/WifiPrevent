@@ -123,6 +123,10 @@ def test_full_capture_preserves_relay_observations(client, headers):
 
     assert response.status_code == 200
     assert any(value["code"] == "plaintext_http" for value in response.json()["indicators"])
+    assert response.json()["relay_metrics_collected"] is True
+    assert response.json()["relay_tcp_connections"] == 4
+    assert response.json()["relay_udp_datagrams"] == 7
+    assert response.json()["relay_tls_or_quic_observations"] == 5
     assert item["relay_metrics_collected"] is True
     assert item["relay_tcp_connections"] == 4
     assert item["relay_udp_datagrams"] == 7
@@ -274,6 +278,12 @@ def test_analysis_sessions_are_isolated(client, headers):
         {"extra": "unexpected"},
         {"relay_metrics_collected": True},
         {"relay_tcp_connections": 1},
+        {
+            "capture_mode": "full",
+            "relay_metrics_collected": True,
+            "relay_tcp_connections": 2,
+            "relay_dns_observations": 1,
+        },
     ],
 )
 def test_invalid_analysis_data_is_rejected(client, headers, change):
