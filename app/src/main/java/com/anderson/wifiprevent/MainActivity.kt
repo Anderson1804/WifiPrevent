@@ -645,6 +645,10 @@ class MainActivity : ComponentActivity() {
                     receipt.indicators.forEach { indicator ->
                         append("\n${indicator.title}: ${indicator.description}")
                     }
+                    if (receipt.recommendations.isNotEmpty()) {
+                        append("\nRecomendaciones preventivas:")
+                        receipt.recommendations.forEach { append("\n• $it") }
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e

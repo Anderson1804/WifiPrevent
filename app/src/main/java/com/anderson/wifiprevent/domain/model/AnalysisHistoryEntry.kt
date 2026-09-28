@@ -18,6 +18,7 @@ data class AnalysisHistoryEntry(
     val captureMode: String,
     val indicators: List<TrafficIndicator>,
     val sampleQuality: String,
+    val recommendations: List<String>,
     val relayMetricsCollected: Boolean,
     val relayMetrics: RelayCaptureMetrics
 )

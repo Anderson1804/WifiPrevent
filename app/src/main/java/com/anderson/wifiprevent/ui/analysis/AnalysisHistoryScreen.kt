@@ -280,6 +280,12 @@ private fun AnalysisHistoryCard(
                     Text(indicator.description, style = MaterialTheme.typography.bodySmall)
                 }
             }
+            if (entry.recommendations.isNotEmpty()) {
+                Text("Recomendaciones preventivas", fontWeight = FontWeight.Bold)
+                entry.recommendations.forEach { recommendation ->
+                    Text("• $recommendation")
+                }
+            }
             Text(
                 if (entry.captureMode == "full" && entry.trafficAnalysisPerformed) {
                     if (entry.relayMetricsCollected) {

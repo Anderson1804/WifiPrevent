@@ -200,6 +200,7 @@ class BackendClient(context: Context) {
                 captureMode = reply.getString("capture_mode"),
                 indicators = reply.indicators("indicators"),
                 sampleQuality = reply.getString("sample_quality"),
+                recommendations = reply.stringList("recommendations"),
                 relayMetricsCollected = reply.getBoolean("relay_metrics_collected"),
                 relayMetrics = RelayCaptureMetrics(
                     tcpConnections = reply.getLong("relay_tcp_connections"),
@@ -265,6 +266,7 @@ class BackendClient(context: Context) {
                     captureMode = row.getString("capture_mode"),
                     indicators = row.indicators("indicators"),
                     sampleQuality = row.getString("sample_quality"),
+                    recommendations = row.stringList("recommendations"),
                     relayMetricsCollected = row.getBoolean("relay_metrics_collected"),
                     relayMetrics = RelayCaptureMetrics(
                         tcpConnections = row.getLong("relay_tcp_connections"),
