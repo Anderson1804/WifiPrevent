@@ -8,5 +8,13 @@ data class AnalysisHistorySummary(
     val unknownRisk: Int,
     val notEvaluated: Int,
     val controlledSessions: Int,
-    val fullSessions: Int
+    val fullSessions: Int,
+    val relaySessions: Int,
+    val relayTcpConnections: Long,
+    val relayUdpDatagrams: Long,
+    val relayDnsObservations: Long,
+    val relayHttpObservations: Long,
+    val relayTlsOrQuicObservations: Long,
+    val relayOtherObservations: Long,
+    val relayUniqueDestinations: Long
 )

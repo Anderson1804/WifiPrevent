@@ -175,7 +175,7 @@ class BackendClient(context: Context) {
                 put("http_packets", session.metadata.httpPackets)
                 put("tls_or_quic_packets", session.metadata.tlsOrQuicPackets)
                 put("unique_destinations", session.metadata.uniqueDestinations)
-                put("relay_metrics_collected", session.captureMode.apiValue == "full")
+                put("relay_metrics_collected", session.relayMetricsCollected)
                 put("relay_tcp_connections", session.relayMetrics.tcpConnections)
                 put("relay_udp_datagrams", session.relayMetrics.udpDatagrams)
                 put("relay_dns_observations", session.relayMetrics.dnsObservations)
@@ -293,7 +293,15 @@ class BackendClient(context: Context) {
                 unknownRisk = response.getInt("unknown_risk"),
                 notEvaluated = response.getInt("not_evaluated"),
                 controlledSessions = response.getInt("controlled_sessions"),
-                fullSessions = response.getInt("full_sessions")
+                fullSessions = response.getInt("full_sessions"),
+                relaySessions = response.getInt("relay_sessions"),
+                relayTcpConnections = response.getLong("relay_tcp_connections"),
+                relayUdpDatagrams = response.getLong("relay_udp_datagrams"),
+                relayDnsObservations = response.getLong("relay_dns_observations"),
+                relayHttpObservations = response.getLong("relay_http_observations"),
+                relayTlsOrQuicObservations = response.getLong("relay_tls_or_quic_observations"),
+                relayOtherObservations = response.getLong("relay_other_observations"),
+                relayUniqueDestinations = response.getLong("relay_unique_destinations")
             )
         }
 

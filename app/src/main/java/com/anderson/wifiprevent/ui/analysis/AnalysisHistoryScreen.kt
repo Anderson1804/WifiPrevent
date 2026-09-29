@@ -218,6 +218,28 @@ private fun AnalysisSummaryCard(summary: AnalysisHistorySummary) {
                 "Controladas: ${summary.controlledSessions} · " +
                         "completas: ${summary.fullSessions}"
             )
+            if (summary.relaySessions > 0) {
+                Text("Actividad acumulada", fontWeight = FontWeight.Bold)
+                Text("Capturas completas con observaciones: ${summary.relaySessions}")
+                Text(
+                    "TCP: ${summary.relayTcpConnections} · " +
+                            "UDP: ${summary.relayUdpDatagrams}"
+                )
+                Text(
+                    "DNS: ${summary.relayDnsObservations} · " +
+                            "HTTP: ${summary.relayHttpObservations} · " +
+                            "TLS/QUIC: ${summary.relayTlsOrQuicObservations}"
+                )
+                Text("Otras observaciones: ${summary.relayOtherObservations}")
+                Text(
+                    "Suma de destinos distintos por sesión: " +
+                            summary.relayUniqueDestinations
+                )
+                Text(
+                    "Las cifras son metadatos acumulados y no identifican el contenido visitado.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
     }
 }

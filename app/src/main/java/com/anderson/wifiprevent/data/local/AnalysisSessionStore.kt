@@ -21,6 +21,7 @@ data class StoredAnalysisSession(
     val metadata: TrafficMetadataSummary,
     val captureMode: CaptureMode,
     val uploaded: Boolean,
+    val relayMetricsCollected: Boolean = false,
     val relayMetrics: RelayCaptureMetrics = RelayCaptureMetrics.EMPTY
 )
 
@@ -62,6 +63,14 @@ class AnalysisSessionStore(context: Context) {
             .remove("tunnel_rx_packets")
             .remove("tunnel_tx_packets")
             .putBoolean("uploaded", false)
+            .putBoolean("relay_metrics_collected", false)
+            .remove("relay_tcp_connections")
+            .remove("relay_udp_datagrams")
+            .remove("relay_dns_observations")
+            .remove("relay_http_observations")
+            .remove("relay_tls_or_quic_observations")
+            .remove("relay_other_observations")
+            .remove("relay_unique_destinations")
             .putMetadata(TrafficMetadataSummary.EMPTY)
             .commit()
     }
@@ -109,6 +118,20 @@ class AnalysisSessionStore(context: Context) {
         }
     }
 
+    fun updateRelayMetrics(sessionId: String, metrics: RelayCaptureMetrics) {
+        if (preferences.getString("session_id", null) != sessionId) return
+        preferences.edit()
+            .putBoolean("relay_metrics_collected", true)
+            .putLong("relay_tcp_connections", metrics.tcpConnections)
+            .putLong("relay_udp_datagrams", metrics.udpDatagrams)
+            .putLong("relay_dns_observations", metrics.dnsObservations)
+            .putLong("relay_http_observations", metrics.httpObservations)
+            .putLong("relay_tls_or_quic_observations", metrics.tlsOrQuicObservations)
+            .putLong("relay_other_observations", metrics.otherObservations)
+            .putInt("relay_unique_destinations", metrics.uniqueDestinations)
+            .commit()
+    }
+
     fun snapshot(): StoredAnalysisSession? {
         val id = preferences.getString("session_id", null) ?: return null
         val state = runCatching {
@@ -140,7 +163,19 @@ class AnalysisSessionStore(context: Context) {
             CaptureMode.entries.firstOrNull {
                 it.apiValue == preferences.getString("capture_mode", null)
             } ?: CaptureMode.CONTROLLED,
-            preferences.getBoolean("uploaded", false)
+            preferences.getBoolean("uploaded", false),
+            preferences.getBoolean("relay_metrics_collected", false),
+            RelayCaptureMetrics(
+                tcpConnections = preferences.getLong("relay_tcp_connections", 0),
+                udpDatagrams = preferences.getLong("relay_udp_datagrams", 0),
+                dnsObservations = preferences.getLong("relay_dns_observations", 0),
+                httpObservations = preferences.getLong("relay_http_observations", 0),
+                tlsOrQuicObservations = preferences.getLong(
+                    "relay_tls_or_quic_observations", 0
+                ),
+                otherObservations = preferences.getLong("relay_other_observations", 0),
+                uniqueDestinations = preferences.getInt("relay_unique_destinations", 0)
+            )
         )
     }
 

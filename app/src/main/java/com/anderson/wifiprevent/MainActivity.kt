@@ -609,10 +609,25 @@ class MainActivity : ComponentActivity() {
         analysisUploadMessage = "Guardando la sesión en el servidor local…"
         lifecycleScope.launch {
             try {
-                val enriched = if (stored.captureMode == CaptureMode.FULL) {
-                    stored.copy(
-                        relayMetrics = connectionRepository.getRelayCaptureMetrics(stored.id)
-                    )
+                var relaySnapshotUnavailable = false
+                val enriched = if (
+                    stored.captureMode == CaptureMode.FULL && !stored.relayMetricsCollected
+                ) {
+                    val relayMetrics = try {
+                        connectionRepository.getRelayCaptureMetrics(stored.id)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        relaySnapshotUnavailable = true
+                        null
+                    }
+                    if (relayMetrics != null) {
+                        analysisSessionStore.updateRelayMetrics(stored.id, relayMetrics)
+                        stored.copy(
+                            relayMetricsCollected = true,
+                            relayMetrics = relayMetrics
+                        )
+                    } else stored
                 } else stored
                 val receipt = connectionRepository.saveAnalysis(enriched)
                 analysisSessionStore.markUploaded(receipt.sessionId)
@@ -636,6 +651,15 @@ class MainActivity : ComponentActivity() {
                         append(
                             "\nOtros: ${receipt.relayMetrics.otherObservations} · " +
                                     "destinos únicos: ${receipt.relayMetrics.uniqueDestinations}"
+                        )
+                    } else if (
+                        receipt.captureMode == CaptureMode.FULL.apiValue &&
+                        relaySnapshotUnavailable
+                    ) {
+                        append(
+                            "\nLa sesión se guardó con las métricas agregadas del teléfono. " +
+                                    "Las observaciones del relé ya no estaban disponibles " +
+                                    "después de reiniciar los servicios."
                         )
                     }
                     if (reasons.isNotBlank()) append("\n$reasons")
