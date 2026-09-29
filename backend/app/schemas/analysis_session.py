@@ -162,3 +162,11 @@ class AnalysisHistorySummary(BaseModel):
     not_evaluated: int
     controlled_sessions: int
     full_sessions: int
+    relay_sessions: int
+    relay_tcp_connections: int
+    relay_udp_datagrams: int
+    relay_dns_observations: int
+    relay_http_observations: int
+    relay_tls_or_quic_observations: int
+    relay_other_observations: int
+    relay_unique_destinations: int

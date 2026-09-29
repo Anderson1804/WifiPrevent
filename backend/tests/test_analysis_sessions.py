@@ -155,9 +155,22 @@ def test_analysis_summary_counts_only_the_current_installation(client, headers):
     assert client.post(
         "/api/v1/analysis-sessions", json=reading(), headers=headers,
     ).status_code == 200
+    relay_payload = reading() | {
+        "session_id": str(uuid4()),
+        "security_type": "OPEN",
+        "capture_mode": "full",
+        "relay_metrics_collected": True,
+        "relay_tcp_connections": 4,
+        "relay_udp_datagrams": 7,
+        "relay_dns_observations": 3,
+        "relay_http_observations": 1,
+        "relay_tls_or_quic_observations": 5,
+        "relay_other_observations": 2,
+        "relay_unique_destinations": 6,
+    }
     assert client.post(
         "/api/v1/analysis-sessions",
-        json=reading() | {"session_id": str(uuid4()), "security_type": "OPEN", "capture_mode": "full"},
+        json=relay_payload,
         headers=headers,
     ).status_code == 200
     other_headers = {"Authorization": "Bearer " + "b" * 64}
@@ -179,6 +192,14 @@ def test_analysis_summary_counts_only_the_current_installation(client, headers):
         "not_evaluated": 0,
         "controlled_sessions": 1,
         "full_sessions": 1,
+        "relay_sessions": 1,
+        "relay_tcp_connections": 4,
+        "relay_udp_datagrams": 7,
+        "relay_dns_observations": 3,
+        "relay_http_observations": 1,
+        "relay_tls_or_quic_observations": 5,
+        "relay_other_observations": 2,
+        "relay_unique_destinations": 6,
     }
 
 

@@ -66,6 +66,30 @@ def analysis_history_summary(
             func.count().filter(
                 AnalysisSessionRecord.capture_mode == "full"
             ).label("full_sessions"),
+            func.count().filter(
+                AnalysisSessionRecord.relay_metrics_collected.is_(True)
+            ).label("relay_sessions"),
+            func.coalesce(func.sum(AnalysisSessionRecord.relay_tcp_connections), 0).label(
+                "relay_tcp_connections"
+            ),
+            func.coalesce(func.sum(AnalysisSessionRecord.relay_udp_datagrams), 0).label(
+                "relay_udp_datagrams"
+            ),
+            func.coalesce(func.sum(AnalysisSessionRecord.relay_dns_observations), 0).label(
+                "relay_dns_observations"
+            ),
+            func.coalesce(func.sum(AnalysisSessionRecord.relay_http_observations), 0).label(
+                "relay_http_observations"
+            ),
+            func.coalesce(
+                func.sum(AnalysisSessionRecord.relay_tls_or_quic_observations), 0
+            ).label("relay_tls_or_quic_observations"),
+            func.coalesce(func.sum(AnalysisSessionRecord.relay_other_observations), 0).label(
+                "relay_other_observations"
+            ),
+            func.coalesce(func.sum(AnalysisSessionRecord.relay_unique_destinations), 0).label(
+                "relay_unique_destinations"
+            ),
         ).where(AnalysisSessionRecord.owner_hash == owner)
     ).one()
     return AnalysisHistorySummary(**row._mapping)

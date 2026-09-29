@@ -130,6 +130,9 @@ usuario y no presentan los metadatos como confirmación de una amenaza.
 GET /api/v1/analysis-sessions/summary devuelve los totales de sesiones por nivel
 de riesgo y modo de captura para la instalación autenticada. Incluye por separado
 los registros sin información suficiente y los registros históricos no evaluados.
+También agrega las observaciones del relé de las capturas completas: transporte,
+categorías inferidas por puerto y la suma de destinos distintos dentro de cada sesión.
+No devuelve direcciones ni permite identificar el contenido visitado.
 GET /api/v1/analysis-sessions acepta los filtros opcionales `risk_level` (`low`,
 `medium`, `high` o `unknown`) y `capture_mode` (`controlled` o `full`). Los filtros
 se mantienen durante la paginación y solo consultan la instalación autenticada.
@@ -142,6 +145,13 @@ captura completa. GET /api/v1/relay-captures/{session_id} devuelve su instantán
 agregada. Ambos requieren la identidad de instalación; FastAPI se comunica con el
 control interno del relé únicamente por loopback. Android prepara el acumulador antes
 de solicitar la VPN y recupera la instantánea cuando termina la sesión.
+Android conserva localmente esa instantánea antes de enviar la sesión. Si el guardado
+falla después de recuperarla, el reintento reutiliza exactamente las mismas métricas
+sin depender de que el relé continúe en ejecución.
+Si los servicios se reiniciaron antes de que Android pudiera recuperar la instantánea,
+el reintento guarda la captura completa con sus métricas agregadas y declara
+`relay_metrics_collected=false`; la ausencia del dato no se representa como un conteo
+observado de cero.
 Cada sesión guarda `assessment_version`, que identifica la versión de reglas utilizada
 para producir su evaluación. La migración marca como `legacy` los resultados calculados
 antes de incorporar este versionado; no vuelve a calcular ni altera su nivel original.
