@@ -49,8 +49,9 @@ IPv4 capturado por la VPN experimental continúe hacia Internet durante el desar
   La interfaz se vuelve a dibujar cuando cambia el estado.
 - **VpnService:** crea una interfaz TUN después de que Android muestra su diálogo de
   autorización. Permite contar tráfico del dispositivo sin acceso root.
-- **SharedPreferences:** conserva la identidad aleatoria de la instalación, reintentos
-  y el estado temporal de la sesión. El historial definitivo está en PostgreSQL.
+- **SharedPreferences:** conserva la identidad aleatoria de la instalación, los datos
+  locales necesarios para reintentar un guardado y el estado de la sesión. El historial
+  definitivo está en PostgreSQL.
 - **HttpURLConnection:** envía JSON al backend local. En el emulador usa `10.0.2.2`,
   que representa a la PC anfitriona.
 - **hev-socks5-tunnel 2.17.1:** biblioteca nativa incluida para `x86_64` y `arm64-v8a`.
@@ -149,7 +150,12 @@ del túnel vuelva a entrar al mismo túnel.
 
 El servicio se ejecuta en primer plano con una notificación permanente y un botón para
 detenerlo. Cada segundo consulta al motor nativo y guarda contadores de paquetes y
-bytes. Al detenerse toma una lectura final y envía el resumen al backend.
+bytes. Al detenerse toma una lectura final. El backend consulta la instantánea
+agregada del relé y Android la conserva localmente antes de enviar la sesión.
+
+El relé clasifica conexiones TCP y datagramas UDP por puerto de destino en DNS, HTTP,
+TLS/QUIC u otros. Es una inferencia por puerto: no inspecciona la carga útil ni confirma
+el protocolo dentro del contenido.
 
 La activación de una VPN puede causar una interrupción muy breve mientras Android
 cambia las rutas. El comportamiento observado en el emulador dura menos de un segundo.
@@ -182,20 +188,38 @@ La calidad se calcula sin alterar el riesgo:
 Se calcula al guardar y al consultar el historial. Por eso funciona también con filas
 antiguas sin agregar una columna a PostgreSQL.
 
+### Etapa 7: observaciones, recuperación e historial
+
+Las métricas del relé se guardan junto con la sesión cuando la instantánea está
+disponible. Si falla el envío, Android conserva la sesión y reutiliza el mismo UUID al
+reintentar. Si el relé perdió su instantánea porque se reiniciaron los servicios antes
+de recuperarla, la app puede guardar los contadores del túnel con
+`relay_metrics_collected=false`; esa ausencia no se presenta como valores observados en
+cero.
+
+El historial resume resultados por instalación, permite filtrar por nivel y modo, y
+muestra recomendaciones basadas en reglas. Cada tarjeta permite compartir un texto con
+los datos agregados, sin direcciones de destino ni contenido del tráfico.
+
 ## 6. Cómo fluye una sesión completa
 
 1. El usuario prepara una sesión y la app genera su UUID.
-2. Android muestra la autorización de VPN.
-3. La app registra SSID, seguridad y portal cautivo disponibles al comenzar.
-4. `TrafficAnalysisService` crea el TUN y arranca el motor nativo.
-5. El motor conduce IPv4 al relé SOCKS5 y actualiza contadores.
-6. La pantalla consulta el estado local cada segundo.
-7. El usuario detiene la sesión; se congelan los valores finales.
-8. `BackendClient` construye JSON y lo envía por HTTP.
-9. Pydantic valida el contrato.
-10. Los servicios Python calculan riesgo, razones, indicadores y calidad.
-11. SQLAlchemy inserta la sesión y PostgreSQL confirma la transacción.
-12. FastAPI devuelve el recibo y la app muestra el resultado.
+2. Para captura completa, la app prepara en el relé el acumulador asociado a ese UUID.
+3. Android muestra la autorización de VPN si aún no se había concedido.
+4. La app registra SSID, seguridad y portal cautivo disponibles al comenzar.
+5. `TrafficAnalysisService` crea el TUN y arranca el motor nativo.
+6. El motor conduce IPv4 al relé SOCKS5 y actualiza contadores agregados; la pantalla
+   consulta el estado local cada segundo.
+7. El usuario detiene la sesión y se congelan los valores finales.
+8. Android recupera y persiste localmente la instantánea del relé cuando sigue
+   disponible.
+9. `BackendClient` construye JSON y lo envía por HTTP.
+10. Pydantic valida el contrato.
+11. Los servicios Python calculan riesgo, razones, indicadores, recomendaciones y
+    calidad de muestra.
+12. SQLAlchemy inserta la sesión y PostgreSQL confirma la transacción.
+13. FastAPI devuelve el recibo y la app muestra el resultado. Si el envío falla, se
+    puede reintentar con el mismo UUID para evitar duplicados.
 
 ## 7. Kotlin explicado desde la base
 
@@ -282,36 +306,38 @@ uso del aplicativo.
 
 ## 9. Privacidad y límites actuales
 
-El sistema no guarda contenido de paquetes, contraseñas Wi-Fi ni coordenadas. El
-backend local usa HTTP solamente en compilaciones de desarrollo. Antes de publicar se
-requieren HTTPS, cuentas o autenticación robusta, política de conservación y un backend
-desplegado de manera segura.
+El sistema no guarda contenido de paquetes, contraseñas Wi-Fi ni coordenadas. El SSID
+puede guardarse cuando Android lo entrega. El backend local usa HTTP solamente en
+compilaciones de desarrollo. Antes de publicar se requieren HTTPS, cuentas o
+autenticación robusta, política de conservación y un backend desplegado de manera
+segura.
 
-La captura completa clasifica actualmente volumen agregado. La clasificación detallada
-del tráfico real aún no está conectada al historial porque un intento de callback JNI
-resultó inestable; se mantuvo la ruta segura de contadores. IPv6 queda fuera del túnel
-completo y la prueba del relé verifica negociación UDP, no una consulta DNS externa de
-extremo a extremo.
-
-El relé ya dispone de un acumulador en memoria que cuenta conexiones TCP, datagramas
-UDP y categorías sugeridas por el puerto. Para contar destinos únicos utiliza HMAC con
-una clave aleatoria que desaparece al reiniciar el proceso. FastAPI dispone de endpoints
-autenticados para iniciar el acumulador con un UUID y leer después la instantánea. Android
-usa ese contrato antes de iniciar la VPN y antes de guardar el resultado. La
-comunicación interna usa `127.0.0.1:1081`, por lo que el puerto de control no queda
-expuesto a la red local. PostgreSQL conserva campos distintos para conexiones TCP,
-datagramas UDP y paquetes del túnel, evitando presentar unidades diferentes como si
-fueran equivalentes.
+La evaluación usa reglas explícitas y versionadas; no se ha implementado aprendizaje
+automático ni se ha validado un conjunto de datos etiquetado. La captura completa
+enruta IPv4; IPv6 queda fuera de ese túnel. Las categorías de protocolo del relé son
+inferencias por puerto de destino y no equivalen a inspección del contenido. El relé
+cuenta destinos únicos mediante HMAC con una clave aleatoria que desaparece al reiniciar
+el proceso; solo se conserva el total. Si Android recuperó la instantánea, guarda sus
+métricas localmente para permitir el reintento aunque se reinicien los servicios. La
+comunicación de control del relé usa `127.0.0.1:1081`; PostgreSQL conserva por separado
+conexiones TCP, datagramas UDP y paquetes del túnel.
 
 ## 10. Próximas etapas
 
-1. Diseñar un canal seguro de métricas por sesión entre el relé y el backend.
-2. Contabilizar protocolos reales sin almacenar contenido ni destinos en texto claro.
-3. Probar reanudación, cambios de Wi-Fi y sesiones largas en el Honor 400 Lite.
-4. Medir consumo de batería, memoria y estabilidad.
-5. Definir y validar el conjunto de datos para clasificación académica.
-6. Comparar reglas y modelo con métricas como precisión, exhaustividad y falsos positivos.
-7. Preparar HTTPS, autenticación y despliegue en nube cuando el prototipo local sea estable.
+1. Completar en el teléfono la verificación del informe compartible, la persistencia
+   local y el reintento después de reiniciar los servicios.
+2. Probar sesiones largas, cambios de Wi-Fi, estabilidad, batería y memoria en el Honor
+   400 Lite.
+3. Definir si el alcance académico requiere ML. Si se incluye, preparar datos autorizados
+   y etiquetados, separar entrenamiento y prueba, y medir precisión, exhaustividad, F1 y
+   falsos positivos. Hasta entonces el prototipo usa reglas.
+4. Acordar cómo estará disponible el backend durante una evaluación en un lugar público;
+   el servicio actual requiere que el teléfono alcance la PC y no está preparado para
+   exponerse directamente en una red pública.
+5. Preparar HTTPS, autenticación y despliegue seguro únicamente si el alcance final lo
+   requiere.
+6. Documentar el protocolo de evaluación, resultados, limitaciones y evidencias para el
+   informe y la sustentación.
 
 ## 11. Comandos habituales
 
