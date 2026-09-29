@@ -43,6 +43,7 @@ import com.anderson.wifiprevent.domain.traffic.CaptureMode
 import com.anderson.wifiprevent.ui.connection.ConnectionScreen
 import com.anderson.wifiprevent.ui.analysis.AnalysisScreen
 import com.anderson.wifiprevent.ui.analysis.AnalysisHistoryScreen
+import com.anderson.wifiprevent.ui.analysis.formatAnalysisReport
 import com.anderson.wifiprevent.ui.history.HistoryScreen
 import com.anderson.wifiprevent.ui.common.formatRiskLevel
 import com.anderson.wifiprevent.ui.common.formatAssessmentVersion
@@ -210,6 +211,7 @@ class MainActivity : ComponentActivity() {
                                 loadAnalysisHistory()
                             },
                             onDelete = { sessionId -> deleteAnalysisHistoryEntry(sessionId) },
+                            onShare = { entry -> shareAnalysisReport(entry) },
                             modifier = Modifier.padding(padding)
                         )
 
@@ -701,6 +703,15 @@ class MainActivity : ComponentActivity() {
         wifiConnectionObserver.start(
             hasLocationPermission = permissionGranted
         )
+    }
+
+    private fun shareAnalysisReport(entry: AnalysisHistoryEntry) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "Resumen de análisis WiFiPrevent")
+            putExtra(Intent.EXTRA_TEXT, formatAnalysisReport(entry))
+        }
+        startActivity(Intent.createChooser(intent, "Compartir resumen de análisis"))
     }
 }
 

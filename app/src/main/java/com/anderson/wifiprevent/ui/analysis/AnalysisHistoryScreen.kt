@@ -56,6 +56,7 @@ fun AnalysisHistoryScreen(
     onRiskFilterChange: (String?) -> Unit,
     onCaptureModeFilterChange: (String?) -> Unit,
     onDelete: (String) -> Unit,
+    onShare: (AnalysisHistoryEntry) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var pendingDelete by remember { mutableStateOf<AnalysisHistoryEntry?>(null) }
@@ -128,7 +129,8 @@ fun AnalysisHistoryScreen(
                 entry = entry,
                 deleting = deletingId == entry.id,
                 deleteEnabled = deletingId == null && !loading,
-                onDelete = { pendingDelete = entry }
+                onDelete = { pendingDelete = entry },
+                onShare = { onShare(entry) }
             )
         }
         if (hasMore) item {
@@ -249,7 +251,8 @@ private fun AnalysisHistoryCard(
     entry: AnalysisHistoryEntry,
     deleting: Boolean,
     deleteEnabled: Boolean,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onShare: () -> Unit
 ) {
     Card(Modifier.fillMaxWidth()) {
         Column(
@@ -343,6 +346,12 @@ private fun AnalysisHistoryCard(
             }
             if (entry.captureMode == "controlled") StoredMetadata(entry.metadata)
             Text("Sesión: ${entry.id}", style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(
+                onClick = onShare,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Compartir resumen")
+            }
             TextButton(
                 onClick = onDelete,
                 enabled = deleteEnabled,
