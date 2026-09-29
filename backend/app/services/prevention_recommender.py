@@ -36,7 +36,7 @@ def recommend_preventive_actions(
         )
     if "plaintext_http" in codes:
         recommendations.append(
-            "No introduzcas contraseñas ni datos personales en páginas que no muestren HTTPS."
+            "Revisa si la conexión observada en el puerto 80 corresponde a HTTP y evita enviar datos sensibles si el sitio no redirige a HTTPS."
         )
     if "outbound_volume_dominant" in codes:
         recommendations.append(
