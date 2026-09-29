@@ -8,6 +8,7 @@ fun formatSecurityType(securityType: String?): String {
         "WPA_WPA2_ENTERPRISE" -> "WPA/WPA2 empresarial"
         "WPA3_SAE" -> "WPA3 personal"
         "OWE" -> "Red abierta con cifrado OWE"
+        "OWE_TRANSITION" -> "Red en transición a cifrado OWE"
         "OTHER_OR_UNKNOWN" -> "Otro tipo o desconocido"
         else -> "No disponible"
     }

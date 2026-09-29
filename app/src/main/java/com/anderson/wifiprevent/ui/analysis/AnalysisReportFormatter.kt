@@ -5,12 +5,23 @@ import com.anderson.wifiprevent.ui.common.formatAssessmentVersion
 import com.anderson.wifiprevent.ui.common.formatRiskLevel
 import com.anderson.wifiprevent.ui.common.formatSampleQuality
 import com.anderson.wifiprevent.ui.common.formatSecurityType
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 fun formatAnalysisReport(entry: AnalysisHistoryEntry): String = buildString {
     appendLine("WiFiPrevent - Resumen de análisis")
     appendLine("Red: ${entry.ssid ?: "Nombre no disponible"}")
-    appendLine("Fecha registrada: ${entry.receivedAt}")
+    appendLine("Fecha registrada: ${formatReportDate(entry.receivedAt)}")
     appendLine("Seguridad: ${formatSecurityType(entry.securityType)}")
+    appendLine(
+        "Portal cautivo: " + when (entry.captivePortal) {
+            true -> "detectado"
+            false -> "no detectado"
+            null -> "sin dato"
+        }
+    )
     appendLine("Modo: ${if (entry.captureMode == "full") "captura completa" else "validación controlada"}")
     appendLine("Evaluación preliminar: ${formatRiskLevel(entry.riskLevel, entry.assessmentScope != null)}")
     appendLine("Método: ${formatAssessmentVersion(entry.assessmentVersion)}")
@@ -29,7 +40,7 @@ fun formatAnalysisReport(entry: AnalysisHistoryEntry): String = buildString {
         appendLine("TCP: ${entry.relayMetrics.tcpConnections}")
         appendLine("UDP: ${entry.relayMetrics.udpDatagrams}")
         appendLine("DNS: ${entry.relayMetrics.dnsObservations}")
-        appendLine("HTTP: ${entry.relayMetrics.httpObservations}")
+        appendLine("Conexiones al puerto 80 (posible HTTP): ${entry.relayMetrics.httpObservations}")
         appendLine("TLS/QUIC: ${entry.relayMetrics.tlsOrQuicObservations}")
         appendLine("Otros: ${entry.relayMetrics.otherObservations}")
         appendLine("Destinos únicos: ${entry.relayMetrics.uniqueDestinations}")
@@ -62,3 +73,9 @@ private fun formatReportBytes(bytes: Long): String = when {
 
 private fun formatReportDuration(totalSeconds: Long): String =
     "%02d:%02d".format(totalSeconds / 60, totalSeconds % 60)
+
+private fun formatReportDate(value: String): String = runCatching {
+    OffsetDateTime.parse(value)
+        .atZoneSameInstant(ZoneId.systemDefault())
+        .format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm:ss", Locale.forLanguageTag("es")))
+}.getOrDefault(value)
