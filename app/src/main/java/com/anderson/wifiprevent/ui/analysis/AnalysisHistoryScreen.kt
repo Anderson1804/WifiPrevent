@@ -207,8 +207,8 @@ private fun AnalysisSummaryCard(summary: AnalysisHistorySummary) {
             )
             Text("Sesiones registradas: ${summary.totalSessions}")
             Text(
-                "Riesgo bajo: ${summary.lowRisk} · medio: ${summary.mediumRisk} · " +
-                        "alto: ${summary.highRisk}"
+                "Evaluaciones preliminares por sesión — bajo: ${summary.lowRisk} · " +
+                        "medio: ${summary.mediumRisk} · alto: ${summary.highRisk}"
             )
             if (summary.unknownRisk > 0 || summary.notEvaluated > 0) {
                 Text(
@@ -219,6 +219,12 @@ private fun AnalysisSummaryCard(summary: AnalysisHistorySummary) {
             Text(
                 "Controladas: ${summary.controlledSessions} · " +
                         "completas: ${summary.fullSessions}"
+            )
+            Text(
+                "Estos conteos resumen las sesiones guardadas. Un nivel alto no confirma " +
+                        "una amenaza y unas pocas sesiones no permiten generalizar sobre " +
+                        "otras redes o usuarios.",
+                style = MaterialTheme.typography.bodySmall
             )
             if (summary.relaySessions > 0) {
                 Text("Actividad acumulada", fontWeight = FontWeight.Bold)
