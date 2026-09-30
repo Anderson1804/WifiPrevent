@@ -57,9 +57,37 @@ fun AnalysisHistoryScreen(
     onCaptureModeFilterChange: (String?) -> Unit,
     onDelete: (String) -> Unit,
     onShare: (AnalysisHistoryEntry) -> Unit,
+    exportingId: String?,
+    exportMessage: String?,
+    onExport: (AnalysisHistoryEntry) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var pendingDelete by remember { mutableStateOf<AnalysisHistoryEntry?>(null) }
+    var pendingExport by remember { mutableStateOf<AnalysisHistoryEntry?>(null) }
+    pendingExport?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { pendingExport = null },
+            title = { Text("Exportar métricas para investigación") },
+            text = {
+                Text(
+                    "Guardarás un CSV con contadores de esta sesión, sin nombre de red, " +
+                            "identificadores ni contenido del tráfico. El escenario y el nivel " +
+                            "de referencia quedan vacíos: deben completarse con el protocolo " +
+                            "de investigación, sin copiar la evaluación del aplicativo. " +
+                            "Elige una carpeta local si deseas mantener el archivo en el teléfono."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingExport = null
+                    onExport(entry)
+                }) { Text("Elegir dónde guardar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingExport = null }) { Text("Cancelar") }
+            }
+        )
+    }
     pendingDelete?.let { entry ->
         AlertDialog(
             onDismissRequest = { if (deletingId == null) pendingDelete = null },
@@ -120,6 +148,7 @@ fun AnalysisHistoryScreen(
         error?.let { message -> item {
             Text(message, color = MaterialTheme.colorScheme.error)
         } }
+        exportMessage?.let { message -> item { Text(message) } }
         if (!loading && error == null && entries.isEmpty()) item {
             Text("Todavía no hay análisis guardados.", style = MaterialTheme.typography.titleMedium)
             Text("Realiza y detén una sesión para crear el primer registro.")
@@ -128,9 +157,12 @@ fun AnalysisHistoryScreen(
             AnalysisHistoryCard(
                 entry = entry,
                 deleting = deletingId == entry.id,
-                deleteEnabled = deletingId == null && !loading,
+                deleteEnabled = deletingId == null && exportingId == null && !loading,
                 onDelete = { pendingDelete = entry },
-                onShare = { onShare(entry) }
+                onShare = { onShare(entry) },
+                exporting = exportingId == entry.id,
+                exportEnabled = exportingId == null && deletingId == null && !loading,
+                onExport = { pendingExport = entry }
             )
         }
         if (hasMore) item {
@@ -258,7 +290,10 @@ private fun AnalysisHistoryCard(
     deleting: Boolean,
     deleteEnabled: Boolean,
     onDelete: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    exporting: Boolean,
+    exportEnabled: Boolean,
+    onExport: () -> Unit
 ) {
     Card(Modifier.fillMaxWidth()) {
         Column(
@@ -357,6 +392,23 @@ private fun AnalysisHistoryCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Compartir resumen")
+            }
+            if (entry.captureMode == "full") {
+                val adequateForExport = entry.relayMetricsCollected &&
+                        entry.metrics.durationSeconds >= 30 &&
+                        entry.metrics.receivedPackets + entry.metrics.transmittedPackets >= 100
+                OutlinedButton(
+                    onClick = onExport,
+                    enabled = exportEnabled && adequateForExport,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(if (exporting) "Preparando CSV…" else "Exportar métricas CSV") }
+                if (!adequateForExport) {
+                    Text(
+                        "Para exportar: al menos 30 segundos, 100 paquetes y " +
+                                "observaciones del relé disponibles.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
             TextButton(
                 onClick = onDelete,

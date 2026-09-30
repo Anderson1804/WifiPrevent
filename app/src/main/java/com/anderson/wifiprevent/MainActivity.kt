@@ -52,6 +52,8 @@ import com.anderson.wifiprevent.ui.theme.WifiPreventTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.anderson.wifiprevent.data.remote.BackendClient
 import com.anderson.wifiprevent.data.repository.ConnectionRepository
 
@@ -93,6 +95,9 @@ class MainActivity : ComponentActivity() {
     private var analysisHistoryError by mutableStateOf<String?>(null)
     private var analysisHistoryCursor: String? = null
     private var analysisHistoryHasMore by mutableStateOf(false)
+    private var analysisHistoryExportingId by mutableStateOf<String?>(null)
+    private var analysisHistoryExportMessage by mutableStateOf<String?>(null)
+    private var pendingTrainingCsv: String? = null
     private var connection by mutableStateOf<WifiSnapshot?>(null)
     private var permissionGranted by mutableStateOf(false)
     private var locationEnabled by mutableStateOf(false)
@@ -173,8 +178,51 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val trainingCsvDocument = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        val csv = pendingTrainingCsv
+        pendingTrainingCsv = null
+        if (uri == null || csv == null) {
+            analysisHistoryExportingId = null
+            analysisHistoryExportMessage = if (uri == null) "Exportación cancelada."
+                else "La exportación no pudo recuperarse. Vuelve a intentarlo."
+        } else {
+            lifecycleScope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        val stream = contentResolver.openOutputStream(uri, "wt")
+                            ?: error("No se pudo abrir el archivo elegido.")
+                        stream.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
+                    }
+                    analysisHistoryExportMessage =
+                        "CSV guardado. El escenario, la partición y el nivel de referencia " +
+                                "están pendientes de completar."
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    analysisHistoryError = "No se pudo escribir el CSV. Vuelve a exportar la sesión."
+                } finally {
+                    analysisHistoryExportingId = null
+                }
+            }
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("training_csv", pendingTrainingCsv)
+        outState.putString("training_csv_session", analysisHistoryExportingId)
+        super.onSaveInstanceState(outState)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingTrainingCsv = savedInstanceState?.getString("training_csv")
+        if (pendingTrainingCsv != null) {
+            analysisHistoryExportingId = savedInstanceState?.getString("training_csv_session")
+            currentScreen = AppScreen.ANALYSIS_HISTORY
+            loadAnalysisHistory()
+        }
         restoreAnalysisSession()
         enableEdgeToEdge()
         setContent {
@@ -212,6 +260,9 @@ class MainActivity : ComponentActivity() {
                             },
                             onDelete = { sessionId -> deleteAnalysisHistoryEntry(sessionId) },
                             onShare = { entry -> shareAnalysisReport(entry) },
+                            exportingId = analysisHistoryExportingId,
+                            exportMessage = analysisHistoryExportMessage,
+                            onExport = { entry -> exportTrainingObservation(entry) },
                             modifier = Modifier.padding(padding)
                         )
 
@@ -405,7 +456,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun deleteAnalysisHistoryEntry(sessionId: String) {
-        if (analysisHistoryDeletingId != null || analysisHistoryLoading) return
+        if (analysisHistoryDeletingId != null || analysisHistoryLoading ||
+            analysisHistoryExportingId != null) return
         analysisHistoryDeletingId = sessionId
         analysisHistoryError = null
         lifecycleScope.launch {
@@ -703,6 +755,27 @@ class MainActivity : ComponentActivity() {
         wifiConnectionObserver.start(
             hasLocationPermission = permissionGranted
         )
+    }
+
+    private fun exportTrainingObservation(entry: AnalysisHistoryEntry) {
+        if (analysisHistoryExportingId != null || analysisHistoryDeletingId != null ||
+            analysisHistoryLoading) return
+        analysisHistoryExportingId = entry.id
+        analysisHistoryExportMessage = null
+        analysisHistoryError = null
+        lifecycleScope.launch {
+            try {
+                pendingTrainingCsv = connectionRepository.getTrainingObservationCsv(entry.id)
+                trainingCsvDocument.launch("wifiprevent_observacion.csv")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                pendingTrainingCsv = null
+                analysisHistoryError = e.message ?: "No se pudo preparar el CSV."
+            } finally {
+                if (pendingTrainingCsv == null) analysisHistoryExportingId = null
+            }
+        }
     }
 
     private fun shareAnalysisReport(entry: AnalysisHistoryEntry) {

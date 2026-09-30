@@ -99,7 +99,8 @@ class BackendClient(context: Context) {
     }
 
     private fun request(method: String, path: String, payload: String? = null,
-                        requestId: String? = null): JSONObject {
+                        requestId: String? = null,
+                        validationFailureMessage: String? = null): JSONObject {
         check(debug) { "El servidor de producción todavía no está configurado." }
         val connection = URL("$backendBaseUrl$path").openConnection() as HttpURLConnection
         try {
@@ -123,7 +124,7 @@ class BackendClient(context: Context) {
                 401 -> error("No se pudo identificar esta instalación. Revisa la versión del backend.")
                 404 -> error("El registro ya no está disponible. Actualiza el historial.")
                 409 -> error("El identificador del envío tiene otros datos. No se guardó un duplicado.")
-                422 -> error("El servidor rechazó los datos. Revisa la versión de la aplicación.")
+                422 -> error(validationFailureMessage ?: "El servidor rechazó los datos. Revisa la versión de la aplicación.")
                 503 -> {
                     val detail = runCatching {
                         val body = connection.errorStream
@@ -281,6 +282,18 @@ class BackendClient(context: Context) {
             }
             AnalysisHistoryPage(entries, response.nullableString("next_before"))
         }
+
+    suspend fun trainingObservationCsv(sessionId: String): String = withContext(Dispatchers.IO) {
+        val response = request(
+            "GET", "/api/v1/analysis-sessions/${UUID.fromString(sessionId)}/training-observation",
+            validationFailureMessage = "Esta sesión no tiene una muestra compatible para exportar. " +
+                    "Realiza una captura completa de al menos 30 segundos, 100 paquetes " +
+                    "y observaciones del relé disponibles."
+        )
+        response.getString("csv_content").also {
+            check(it.isNotBlank()) { "El servidor no devolvió las métricas para exportar." }
+        }
+    }
 
     suspend fun analysisHistorySummary(): AnalysisHistorySummary =
         withContext(Dispatchers.IO) {

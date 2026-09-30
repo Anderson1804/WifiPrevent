@@ -44,6 +44,9 @@ class ConnectionRepository(
         backendClient.deleteAnalysis(sessionId)
     }
 
+    suspend fun getTrainingObservationCsv(sessionId: String): String =
+        backendClient.trainingObservationCsv(sessionId)
+
     suspend fun startRelayCapture(sessionId: String) {
         backendClient.startRelayCapture(sessionId)
     }
