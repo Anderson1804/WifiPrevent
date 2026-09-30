@@ -346,6 +346,12 @@ que completar el conjunto con referencias independientes y escenarios separados.
 
 ## 10. Próximas etapas
 
+La interfaz usa tres destinos: Inicio, Análisis e Historial. Historial concentra los
+análisis y las consultas rápidas en un único acceso. Las tarjetas presentan la red,
+el riesgo y un resumen; los motivos, contadores, recomendaciones y acciones están
+en secciones desplegables. La [auditoría de interfaz](AUDITORIA_UI.md) documenta los
+cambios y las comprobaciones pendientes en el teléfono.
+
 1. Completar en el teléfono la verificación del informe compartible, la persistencia
    local y el reintento después de reiniciar los servicios.
 2. Probar sesiones largas, cambios de Wi-Fi, estabilidad, batería y memoria en el Honor
