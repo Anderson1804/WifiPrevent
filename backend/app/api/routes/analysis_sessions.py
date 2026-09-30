@@ -15,7 +15,10 @@ from app.schemas.analysis_session import (
     AnalysisSessionPage,
     AnalysisSessionReading,
     AnalysisSessionReceipt,
+    AnalysisTrainingObservation,
 )
+from app.services.ml_risk_classifier import FEATURE_NAMES
+from app.services.training_observation_exporter import export_training_observation
 from app.services import (
     ASSESSMENT_VERSION,
     evaluate_analysis_risk,
@@ -26,6 +29,31 @@ from app.services import (
 
 
 router = APIRouter(prefix="/api/v1/analysis-sessions", tags=["analysis-sessions"])
+
+
+@router.get("/{session_id}/training-observation", response_model=AnalysisTrainingObservation)
+def training_observation(
+        session_id: UUID,
+        session: DatabaseSession,
+        owner: OwnerHash,
+        response: Response,
+) -> AnalysisTrainingObservation:
+    record = session.scalar(
+        select(AnalysisSessionRecord).where(
+            AnalysisSessionRecord.session_id == session_id,
+            AnalysisSessionRecord.owner_hash == owner,
+        )
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada.")
+    try:
+        csv_content = export_training_observation({
+            name: getattr(record, name) for name in FEATURE_NAMES
+        })
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return AnalysisTrainingObservation(csv_content=csv_content)
 
 
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -111,6 +139,7 @@ def save_analysis_session(
         transmitted_bytes=reading.transmitted_bytes,
         received_packets=reading.received_packets,
         transmitted_packets=reading.transmitted_packets,
+        ml_features=values,
     )
     indicators = evaluate_traffic_indicators(
         capture_mode=reading.capture_mode,
@@ -151,9 +180,12 @@ def save_analysis_session(
                 else "connection_metadata"
             ),
             assessment_version=(
-                ASSESSMENT_VERSION
-                if reading.relay_metrics_collected
-                else "rules-aggregate-v2"
+                assessment.assessment_version
+                or (
+                    ASSESSMENT_VERSION
+                    if reading.relay_metrics_collected
+                    else "rules-aggregate-v2"
+                )
             ),
             traffic_analysis_performed=reading.capture_mode == "full",
             indicators=[indicator.__dict__ for indicator in indicators],

@@ -60,3 +60,23 @@ def test_captive_portal_is_explained_without_being_called_malicious():
     )
     portal_reason = next(reason for reason in result.reasons if "portal cautivo" in reason)
     assert "no demuestra" in portal_reason
+
+
+def test_supervised_prediction_is_used_when_a_compatible_model_is_available(monkeypatch):
+    import app.services.analysis_risk_evaluator as evaluator
+    from app.services.ml_risk_classifier import ModelPrediction
+
+    monkeypatch.setattr(
+        evaluator,
+        "predict_risk_level",
+        lambda _: ModelPrediction("high", "ml-risk-test123456"),
+    )
+
+    result = evaluator.evaluate_analysis_risk(
+        "WPA3_SAE", False, "full", 60, 20_000, 5_000, 80, 30,
+        ml_features={"capture_mode": "full"},
+    )
+
+    assert result.level == "high"
+    assert result.assessment_version == "ml-risk-test123456"
+    assert "no confirma" in result.reasons[0]

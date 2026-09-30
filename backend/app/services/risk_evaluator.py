@@ -14,6 +14,7 @@ RiskLevel = Literal[
 class RiskAssessment:
     level: RiskLevel
     reasons: tuple[str, ...]
+    assessment_version: str | None = None
 
 
 def evaluate_risk(
