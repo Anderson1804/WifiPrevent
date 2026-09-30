@@ -19,6 +19,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -45,9 +49,11 @@ import com.anderson.wifiprevent.ui.analysis.AnalysisScreen
 import com.anderson.wifiprevent.ui.analysis.AnalysisHistoryScreen
 import com.anderson.wifiprevent.ui.analysis.formatAnalysisReport
 import com.anderson.wifiprevent.ui.history.HistoryScreen
-import com.anderson.wifiprevent.ui.common.formatRiskLevel
-import com.anderson.wifiprevent.ui.common.formatAssessmentVersion
-import com.anderson.wifiprevent.ui.common.formatSampleQuality
+import com.anderson.wifiprevent.ui.history.ConnectionHistoryList
+import com.anderson.wifiprevent.ui.history.HistoryCategory
+import com.anderson.wifiprevent.ui.common.AppIcons
+import com.anderson.wifiprevent.domain.model.AnalysisReceipt
+import com.anderson.wifiprevent.domain.model.ConnectionReceipt
 import com.anderson.wifiprevent.ui.theme.WifiPreventTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -59,6 +65,9 @@ import com.anderson.wifiprevent.data.repository.ConnectionRepository
 
 class MainActivity : ComponentActivity() {
     private var currentScreen by mutableStateOf(AppScreen.CONNECTION)
+    private var historyCategory by mutableStateOf(HistoryCategory.ANALYSES)
+    private var analysisReceipt by mutableStateOf<AnalysisReceipt?>(null)
+    private var connectionReceipt by mutableStateOf<ConnectionReceipt?>(null)
     private var analysisSession by mutableStateOf<AnalysisSession?>(null)
     private var analysisMetrics by mutableStateOf(TrafficMetrics.EMPTY)
     private var analysisMetadata by mutableStateOf(TrafficMetadataSummary.EMPTY)
@@ -138,12 +147,10 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (currentScreen == AppScreen.HISTORY) {
-            historyError = if (granted) "Permiso concedido. Pulsa Actualizar historial."
-                else "Permiso de red local requerido. Habilítalo desde los permisos de la aplicación."
-        }
-        if (currentScreen == AppScreen.ANALYSIS_HISTORY) {
-            analysisHistoryError = if (granted) "Permiso concedido. Pulsa Actualizar análisis."
-                else "Permiso de red local requerido. Habilítalo desde los permisos de la aplicación."
+            val message = if (granted) "Permiso concedido. Pulsa Actualizar."
+                else "Activa el permiso de red local para consultar el historial."
+            if (historyCategory == HistoryCategory.ANALYSES) analysisHistoryError = message
+            else historyError = message
         }
         backendError = !granted
         backendMessage = if (granted) "Permiso concedido. Pulsa Guardar consulta."
@@ -210,6 +217,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("screen", currentScreen.name)
+        outState.putString("history_category", historyCategory.name)
         outState.putString("training_csv", pendingTrainingCsv)
         outState.putString("training_csv_session", analysisHistoryExportingId)
         super.onSaveInstanceState(outState)
@@ -217,118 +226,121 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        currentScreen = runCatching { AppScreen.valueOf(savedInstanceState?.getString("screen") ?: "CONNECTION") }
+            .getOrDefault(AppScreen.CONNECTION)
+        historyCategory = runCatching { HistoryCategory.valueOf(savedInstanceState?.getString("history_category") ?: "ANALYSES") }
+            .getOrDefault(HistoryCategory.ANALYSES)
         pendingTrainingCsv = savedInstanceState?.getString("training_csv")
         if (pendingTrainingCsv != null) {
             analysisHistoryExportingId = savedInstanceState?.getString("training_csv_session")
-            currentScreen = AppScreen.ANALYSIS_HISTORY
-            loadAnalysisHistory()
+            currentScreen = AppScreen.HISTORY
+            historyCategory = HistoryCategory.ANALYSES
         }
         restoreAnalysisSession()
+        if (currentScreen == AppScreen.HISTORY) {
+            if (historyCategory == HistoryCategory.ANALYSES) loadAnalysisHistory() else loadHistory()
+        }
         enableEdgeToEdge()
         setContent {
             WifiPreventTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
-                    BackHandler(enabled = currentScreen != AppScreen.CONNECTION) {
-                        currentScreen = AppScreen.CONNECTION
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    bottomBar = {
+                        NavigationBar(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface) {
+                            NavigationBarItem(selected = currentScreen == AppScreen.CONNECTION,
+                                onClick = { currentScreen = AppScreen.CONNECTION },
+                                icon = { Icon(AppIcons.Connection, contentDescription = null) }, label = { Text("Inicio") })
+                            NavigationBarItem(selected = currentScreen == AppScreen.ANALYSIS,
+                                onClick = { openAnalysis() },
+                                icon = { Icon(AppIcons.Analysis, contentDescription = null) }, label = { Text("Análisis") })
+                            NavigationBarItem(selected = currentScreen == AppScreen.HISTORY,
+                                onClick = { openHistory() },
+                                icon = { Icon(AppIcons.History, contentDescription = null) }, label = { Text("Historial") })
+                        }
                     }
+                ) { padding ->
+                    BackHandler(enabled = currentScreen != AppScreen.CONNECTION) { currentScreen = AppScreen.CONNECTION }
                     when (currentScreen) {
-                        AppScreen.ANALYSIS_HISTORY -> AnalysisHistoryScreen(
-                            entries = analysisHistoryEntries,
-                            summary = analysisHistorySummary,
-                            riskFilter = analysisHistoryRiskFilter,
-                            captureModeFilter = analysisHistoryModeFilter,
-                            deletingId = analysisHistoryDeletingId,
-                            loading = analysisHistoryLoading,
-                            error = analysisHistoryError,
-                            hasMore = analysisHistoryHasMore,
-                            onBack = { currentScreen = AppScreen.CONNECTION },
-                            onRefresh = { loadAnalysisHistory() },
-                            onMore = { loadAnalysisHistory(more = true) },
-                            onRiskFilterChange = { value ->
-                                analysisHistoryRiskFilter = value
-                                analysisHistoryEntries = emptyList()
-                                analysisHistoryCursor = null
-                                analysisHistoryHasMore = false
-                                loadAnalysisHistory()
-                            },
-                            onCaptureModeFilterChange = { value ->
-                                analysisHistoryModeFilter = value
-                                analysisHistoryEntries = emptyList()
-                                analysisHistoryCursor = null
-                                analysisHistoryHasMore = false
-                                loadAnalysisHistory()
-                            },
-                            onDelete = { sessionId -> deleteAnalysisHistoryEntry(sessionId) },
-                            onShare = { entry -> shareAnalysisReport(entry) },
-                            exportingId = analysisHistoryExportingId,
-                            exportMessage = analysisHistoryExportMessage,
-                            onExport = { entry -> exportTrainingObservation(entry) },
-                            modifier = Modifier.padding(padding)
-                        )
-
                         AppScreen.HISTORY -> HistoryScreen(
-                            historyEntries,
-                            historyLoading,
-                            historyError,
-                            historyHasMore,
-                            onBack = { currentScreen = AppScreen.CONNECTION },
-                            onRefresh = { loadHistory() },
-                            onMore = { loadHistory(more = true) },
+                            category = historyCategory,
+                            onCategoryChange = { category -> openHistory(category) },
                             modifier = Modifier.padding(padding)
-                        )
-
+                        ) {
+                            if (historyCategory == HistoryCategory.ANALYSES) {
+                                AnalysisHistoryScreen(
+                                    entries = analysisHistoryEntries, summary = analysisHistorySummary,
+                                    riskFilter = analysisHistoryRiskFilter, captureModeFilter = analysisHistoryModeFilter,
+                                    deletingId = analysisHistoryDeletingId, loading = analysisHistoryLoading,
+                                    error = analysisHistoryError, hasMore = analysisHistoryHasMore,
+                                    onRefresh = { loadAnalysisHistory() }, onMore = { loadAnalysisHistory(more = true) },
+                                    onRiskFilterChange = { value ->
+                                        analysisHistoryRiskFilter = value
+                                        analysisHistoryEntries = emptyList()
+                                        analysisHistoryCursor = null
+                                        analysisHistoryHasMore = false
+                                        loadAnalysisHistory()
+                                    },
+                                    onCaptureModeFilterChange = { value ->
+                                        analysisHistoryModeFilter = value
+                                        analysisHistoryEntries = emptyList()
+                                        analysisHistoryCursor = null
+                                        analysisHistoryHasMore = false
+                                        loadAnalysisHistory()
+                                    },
+                                    onDelete = { sessionId -> deleteAnalysisHistoryEntry(sessionId) },
+                                    onShare = { entry -> shareAnalysisReport(entry) },
+                                    exportingId = analysisHistoryExportingId, exportMessage = analysisHistoryExportMessage,
+                                    onExport = { entry -> exportTrainingObservation(entry) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            } else {
+                                ConnectionHistoryList(entries = historyEntries, loading = historyLoading,
+                                    error = historyError, hasMore = historyHasMore,
+                                    onRefresh = { loadHistory() }, onMore = { loadHistory(more = true) },
+                                    modifier = Modifier.weight(1f))
+                            }
+                        }
                         AppScreen.ANALYSIS -> AnalysisScreen(
-                            wifi = connection,
-                            session = analysisSession,
-                            metrics = analysisMetrics,
-                            metadata = analysisMetadata,
-                            uploadMessage = analysisUploadMessage,
-                            uploadError = analysisUploadError,
-                            uploading = analysisUploading,
-                            relayStatus = relayStatus,
-                            checkingRelay = checkingRelay,
-                            fullModeSupported =
-                                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
-                            onBack = { currentScreen = AppScreen.CONNECTION },
-                            onPrepare = { prepareAnalysisSession() },
-                            onStartControlled = {
-                                beginAnalysisAuthorization(CaptureMode.CONTROLLED)
-                            },
-                            onStartFull = {
-                                beginAnalysisAuthorization(CaptureMode.FULL)
-                            },
-                            onStop = { stopAnalysisService() },
-                            onRetryUpload = { uploadCompletedAnalysis() },
-                            onCheckRelay = { checkSocksRelay() },
-                            modifier = Modifier.padding(padding)
+                            wifi = connection, session = analysisSession, metrics = analysisMetrics,
+                            metadata = analysisMetadata, receipt = analysisReceipt,
+                            uploadMessage = analysisUploadMessage, uploadError = analysisUploadError,
+                            uploading = analysisUploading, relayStatus = relayStatus, checkingRelay = checkingRelay,
+                            fullModeSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
+                            onHistory = { openHistory(HistoryCategory.ANALYSES) },
+                            onPrepare = { prepareAnalysisSession(); checkSocksRelay() },
+                            onStartControlled = { beginAnalysisAuthorization(CaptureMode.CONTROLLED) },
+                            onStartFull = { beginAnalysisAuthorization(CaptureMode.FULL) },
+                            onStop = { stopAnalysisService() }, onRetryUpload = { uploadCompletedAnalysis() },
+                            onCheckRelay = { checkSocksRelay() }, modifier = Modifier.padding(padding)
                         )
-
                         AppScreen.CONNECTION -> ConnectionScreen(
-                        connection, permissionGranted, locationEnabled, status, sending, backendMessage, backendError,
-                        onPermission = { permissionRequest.launch(arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        )) },
-                        onSettings = { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                            Uri.parse("package:$packageName"))) },
-                        onLocation = { startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) },
-                        onWifi = { startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) },
-                        onCheck = { sendConnection() },
-                        onAnalysis = { currentScreen = AppScreen.ANALYSIS },
-                        onHistory = {
-                            currentScreen = AppScreen.HISTORY
-                            loadHistory()
-                        },
-                        onAnalysisHistory = {
-                            currentScreen = AppScreen.ANALYSIS_HISTORY
-                            loadAnalysisHistory()
-                        },
-                        modifier = Modifier.padding(padding)
-                    )
+                            wifi = connection, permission = permissionGranted, location = locationEnabled,
+                            status = status, sending = sending, backendMessage = backendMessage, backendError = backendError,
+                            analysisActive = analysisSession?.state == AnalysisSessionState.ANALYZING ||
+                                analysisSession?.state == AnalysisSessionState.PREPARING,
+                            receipt = connectionReceipt,
+                            onPermission = { permissionRequest.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) },
+                            onSettings = { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) },
+                            onLocation = { startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) },
+                            onWifi = { startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) },
+                            onCheck = { sendConnection() }, onAnalysis = { openAnalysis() }, modifier = Modifier.padding(padding)
+                        )
                     }
                 }
             }
         }
+    }
+
+    private fun openHistory(category: HistoryCategory = historyCategory) {
+        currentScreen = AppScreen.HISTORY
+        historyCategory = category
+        if (category == HistoryCategory.ANALYSES) loadAnalysisHistory() else loadHistory()
+    }
+
+    private fun openAnalysis() {
+        currentScreen = AppScreen.ANALYSIS
+        if (analysisSession == null) prepareAnalysisSession()
+        if (analysisSession?.state == AnalysisSessionState.READY) checkSocksRelay()
     }
 
     override fun onResume() {
@@ -385,21 +397,8 @@ class MainActivity : ComponentActivity() {
             try {
                 val receipt =
                     connectionRepository.saveConnection(snapshot)
-                val risk = formatRiskLevel(
-                    receipt.riskLevel,
-                    receipt.analysisPerformed
-                )
-                val reasons = receipt.riskReasons.joinToString(separator = "\n") {
-                    "• $it"
-                }
-                backendMessage = buildString {
-                    append("Red guardada: ${snapshot.ssid ?: "Nombre no disponible"}\n")
-                    append("$risk\n")
-                    if (reasons.isNotBlank()) {
-                        append("$reasons\n")
-                    }
-                    append("Recibo: ${receipt.id}")
-                }
+                connectionReceipt = receipt
+                backendMessage = "Consulta guardada."
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -489,6 +488,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun prepareAnalysisSession() {
+        if (analysisUploading || analysisSession?.state == AnalysisSessionState.ANALYZING ||
+            analysisSession?.state == AnalysisSessionState.PREPARING ||
+            analysisSessionStore.snapshot()?.let {
+                it.state == AnalysisSessionState.COMPLETED && !it.uploaded
+            } == true) return
+        analysisReceipt = null
         analysisTimer.removeCallbacks(analysisTick)
         analysisSessionStore.clear()
         analysisMetrics = TrafficMetrics.EMPTY
@@ -511,6 +516,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun beginAnalysisAuthorization(mode: CaptureMode) {
+        if (analysisSession?.state != AnalysisSessionState.READY || connection == null) return
         analysisSession = analysisSession?.copy(
             state = AnalysisSessionState.PREPARING,
             captureMode = mode
@@ -685,49 +691,10 @@ class MainActivity : ComponentActivity() {
                 } else stored
                 val receipt = connectionRepository.saveAnalysis(enriched)
                 analysisSessionStore.markUploaded(receipt.sessionId)
-                val reasons = receipt.riskReasons.joinToString(separator = "\n") { "• $it" }
-                analysisUploadMessage = buildString {
-                    append("${receipt.message}\n")
-                    append("Evaluación preliminar: ${formatRiskLevel(receipt.riskLevel, true)}")
-                    append("\nMétodo: ${formatAssessmentVersion(receipt.assessmentVersion)}")
-                    append("\nCalidad de la muestra: ${formatSampleQuality(receipt.sampleQuality)}")
-                    if (receipt.relayMetricsCollected) {
-                        append("\nObservaciones del relé:")
-                        append(
-                            "\nTCP: ${receipt.relayMetrics.tcpConnections} conexiones · " +
-                                    "UDP: ${receipt.relayMetrics.udpDatagrams} datagramas"
-                        )
-                        append(
-                            "\nDNS: ${receipt.relayMetrics.dnsObservations} · " +
-                                    "HTTP: ${receipt.relayMetrics.httpObservations} · " +
-                                    "TLS/QUIC: ${receipt.relayMetrics.tlsOrQuicObservations}"
-                        )
-                        append(
-                            "\nOtros: ${receipt.relayMetrics.otherObservations} · " +
-                                    "destinos únicos: ${receipt.relayMetrics.uniqueDestinations}"
-                        )
-                    } else if (
-                        receipt.captureMode == CaptureMode.FULL.apiValue &&
-                        relaySnapshotUnavailable
-                    ) {
-                        append(
-                            "\nLa sesión se guardó con las métricas agregadas del teléfono. " +
-                                    "Las observaciones del relé ya no estaban disponibles " +
-                                    "después de reiniciar los servicios."
-                        )
-                    }
-                    if (reasons.isNotBlank()) append("\n$reasons")
-                    if (!receipt.trafficAnalysisPerformed) {
-                        append("\nLa muestra de protocolos es controlada; la captura completa está pendiente.")
-                    }
-                    receipt.indicators.forEach { indicator ->
-                        append("\n${indicator.title}: ${indicator.description}")
-                    }
-                    if (receipt.recommendations.isNotEmpty()) {
-                        append("\nRecomendaciones preventivas:")
-                        receipt.recommendations.forEach { append("\n• $it") }
-                    }
-                }
+                analysisReceipt = receipt
+                analysisUploadMessage = if (relaySnapshotUnavailable && !receipt.relayMetricsCollected) {
+                    "Guardado en historial. Las categorías de tráfico no estaban disponibles."
+                } else "Guardado en historial."
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -791,6 +758,5 @@ class MainActivity : ComponentActivity() {
 private enum class AppScreen {
     CONNECTION,
     ANALYSIS,
-    ANALYSIS_HISTORY,
     HISTORY
 }

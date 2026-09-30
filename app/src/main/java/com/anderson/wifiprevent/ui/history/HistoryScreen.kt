@@ -6,72 +6,73 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import com.anderson.wifiprevent.domain.model.HistoryEntry
-import com.anderson.wifiprevent.ui.common.formatSecurityType
-import com.anderson.wifiprevent.ui.common.formatRiskLevel
+import com.anderson.wifiprevent.ui.common.*
+
+enum class HistoryCategory { ANALYSES, CONNECTIONS }
 
 @Composable
-fun HistoryScreen(entries: List<HistoryEntry>, loading: Boolean, error: String?,
-                  hasMore: Boolean, onBack: () -> Unit, onRefresh: () -> Unit,
-                  onMore: () -> Unit, modifier: Modifier = Modifier) {
-    LazyColumn(modifier.fillMaxSize().padding(horizontal = 24.dp),
-        contentPadding = PaddingValues(vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item {
-            TextButton(onClick = onBack) { Text("Volver a la conexión") }
-            Text("Historial", style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold)
-            Text(
-                "Consultas guardadas desde esta instalación con su evaluación de riesgo."
-            )
-            OutlinedButton(onClick = onRefresh, enabled = !loading,
-                modifier = Modifier.fillMaxWidth()) { Text("Actualizar historial") }
+fun HistoryScreen(
+    category: HistoryCategory,
+    onCategoryChange: (HistoryCategory) -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(modifier.fillMaxSize().padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(Modifier.height(12.dp))
+        Text("Historial", style = MaterialTheme.typography.headlineLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = category == HistoryCategory.ANALYSES,
+                onClick = { onCategoryChange(HistoryCategory.ANALYSES) }, label = { Text("Análisis") })
+            FilterChip(selected = category == HistoryCategory.CONNECTIONS,
+                onClick = { onCategoryChange(HistoryCategory.CONNECTIONS) }, label = { Text("Consultas rápidas") })
         }
-        if (loading) item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
-        error?.let { message -> item {
-            Text(message, color = MaterialTheme.colorScheme.error)
-        } }
+        content()
+    }
+}
+
+@Composable
+fun ConnectionHistoryList(
+    entries: List<HistoryEntry>, loading: Boolean, error: String?, hasMore: Boolean,
+    onRefresh: () -> Unit, onMore: () -> Unit, modifier: Modifier = Modifier
+) {
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onRefresh, enabled = !loading) { Text("Actualizar") }
+            }
+        }
+        if (loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+        error?.let { item { StatusNotice(it, error = true) } }
         if (!loading && error == null && entries.isEmpty()) item {
-            Text("Todavía no hay consultas guardadas.", style = MaterialTheme.typography.titleMedium)
-            Text("Vuelve a la conexión y pulsa Guardar consulta para crear el primer registro.")
+            Text("Aún no hay consultas", style = MaterialTheme.typography.titleMedium)
+            Text("Guarda una consulta rápida desde Inicio.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         items(entries, key = { it.id }) { entry ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(entry.ssid ?: "Nombre no disponible", style = MaterialTheme.typography.titleLarge)
-                    Text(formatHistoryDate(entry.receivedAt), style = MaterialTheme.typography.labelLarge)
-                    Text(
-                        text = formatRiskLevel(
-                            entry.riskLevel,
-                            entry.analysisPerformed
-                        ),
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    entry.riskReasons.forEach { reason ->
-                        Text(
-                            text = "• $reason",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                    Text(uiDate(entry.receivedAt), style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    RiskBadge(entry.riskLevel, entry.analysisPerformed)
+                    Text(formatSecurityType(entry.securityType), style = MaterialTheme.typography.bodyMedium)
+                    ExpandableSection("Ver consulta") {
+                        if (entry.riskReasons.isNotEmpty()) {
+                            Text("Motivos", style = MaterialTheme.typography.titleSmall)
+                            entry.riskReasons.forEach { Text("• $it") }
+                        }
+                        DetailRow("Señal", entry.rssi?.let { "$it dBm" } ?: "No disponible")
+                        DetailRow("Frecuencia", entry.frequency?.let { "$it MHz" } ?: "No disponible")
+                        DetailRow("Enlace", entry.speed?.let { "$it Mbps" } ?: "No disponible")
+                        DetailRow("Internet", when {
+                            entry.captivePortal -> "Requería iniciar sesión"
+                            entry.internetValidated -> "Disponible al consultar"
+                            else -> "Sin confirmar"
+                        })
                     }
-                    Text("Señal: ${entry.rssi?.let { "$it dBm" } ?: "No disponible"}")
-                    Text("Frecuencia: ${entry.frequency?.let { "$it MHz" } ?: "No disponible"}")
-                    Text("Velocidad del enlace: ${entry.speed?.let { "$it Mbps" } ?: "No disponible"}")
-                    Text(
-                        "Seguridad: ${formatSecurityType(entry.securityType)}"
-                    )
-                    Text(when {
-                        entry.captivePortal -> "La red requería iniciar sesión"
-                        entry.internetValidated -> "Internet validado por Android al consultar"
-                        else -> "Internet no validado por Android al consultar"
-                    })
-                    Text("Recibo: ${entry.id}", style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -79,10 +80,9 @@ fun HistoryScreen(entries: List<HistoryEntry>, loading: Boolean, error: String?,
             OutlinedButton(onClick = onMore, enabled = !loading,
                 modifier = Modifier.fillMaxWidth()) { Text("Cargar más") }
         }
+        if (entries.isNotEmpty()) item {
+            Text("Evaluación orientativa; no confirma una amenaza.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
-
-private fun formatHistoryDate(value: String): String = runCatching {
-    OffsetDateTime.parse(value).atZoneSameInstant(ZoneId.systemDefault())
-        .format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm:ss", Locale.forLanguageTag("es")))
-}.getOrDefault(value)
