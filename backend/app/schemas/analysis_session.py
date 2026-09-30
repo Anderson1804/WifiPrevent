@@ -153,6 +153,10 @@ class AnalysisSessionPage(BaseModel):
     next_before: UUID | None = None
 
 
+class AnalysisTrainingObservation(BaseModel):
+    csv_content: str
+
+
 class AnalysisHistorySummary(BaseModel):
     total_sessions: int
     low_risk: int
