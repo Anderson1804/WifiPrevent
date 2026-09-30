@@ -6,6 +6,31 @@ El campo `reference_risk_level` debe fijarse con los criterios de referencia ant
 consultar el resultado del aplicativo. No copies el `risk_level` generado por las
 reglas del backend: eso enseñaría al modelo a imitar esas mismas reglas.
 
+## Recoger una fila desde el aplicativo
+
+1. Realiza una captura completa autorizada de al menos 30 segundos y 100 paquetes.
+   Debe disponer de observaciones del relé y estar guardada en el backend.
+2. En el historial pulsa `Exportar métricas CSV`, confirma y elige una ubicación.
+   Para conservarla solo en el dispositivo, elige una carpeta local en el selector.
+   Puedes cancelar; eso no elimina ni modifica la sesión.
+3. El archivo contiene un encabezado y una fila de métricas. Los primeros tres
+   campos están vacíos. No incluye SSID, fechas ni identificadores de instalación o
+   sesión, y tampoco incluye el resultado calculado por el aplicativo.
+4. Completa esos campos con el código de escenario, la partición y el nivel fijados
+   en el protocolo de referencia, antes de consultar la predicción del sistema.
+   Un caso de navegación ordinaria no permite asignar un nivel de referencia por sí solo.
+5. Reúne las filas en `observations/risk_observations.csv`, conservando exactamente
+   un encabezado. Usa cada captura una sola vez; exportar nuevamente una sesión
+   produce los mismos valores. Conserva la correspondencia entre capturas y
+   escenarios en tu registro de investigación separado del conjunto de entrenamiento.
+
+No alteres ni inventes las métricas para conseguir clases low, medium y high. Las
+sesiones breves, controladas o sin métricas del relé no se exportan para entrenamiento.
+Los ceros en las métricas del parser no sustituyen las observaciones del relé: son
+grupos de campos distintos y se conservan con sus nombres originales.
+
+## Etiquetas y evaluación
+
 Usa códigos como `benign_01` o `scenario_12` en `scenario_id`; no incluyas nombres,
 SSID, direcciones IP, dominios, credenciales, contenido ni identificadores de usuario.
 Los campos `evaluation_split` aceptan `training` o `test`. Un escenario completo debe

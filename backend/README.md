@@ -136,6 +136,27 @@ No devuelve direcciones ni permite identificar el contenido visitado.
 
 ## Clasificador supervisado experimental
 
+### Exportar observaciones desde el teléfono
+
+En el historial de análisis, `Exportar métricas CSV` permite guardar una captura
+completa con al menos 30 segundos, 100 paquetes y métricas del relé disponibles.
+Android muestra el selector de documentos: el usuario elige el archivo de destino.
+El CSV contiene el encabezado de la plantilla y una fila; `scenario_id`,
+`evaluation_split` y `reference_risk_level` quedan vacíos. La etiqueta de referencia
+debe proceder del protocolo de investigación, nunca del resultado de la app.
+
+El contrato es `GET /api/v1/analysis-sessions/{session_id}/training-observation`,
+autenticado con el mismo Bearer de la instalación. Devuelve JSON con un único campo
+`csv_content` y `Cache-Control: no-store`. Devuelve 401 sin identidad válida, 404
+para una sesión inexistente o ajena y 422 para una muestra incompatible. No cambia
+la sesión ni requiere una migración. El CSV usa una lista explícita de métricas;
+excluye SSID, fechas, UUID, identidad de instalación, riesgos predichos, direcciones
+y contenido. Un tipo de seguridad histórico no reconocido se exporta como UNKNOWN.
+
+Cada archivo es una observación sin etiquetar, no un conjunto listo para entrenar.
+La [guía de datos](data/README.md) explica cómo reunirlos con un solo encabezado y
+completar la referencia independiente. La app no entrena ni activa modelos al exportar.
+
 La propuesta de investigación requiere clasificación supervisada. El repositorio ya
 incluye la validación de un CSV, la comparación de regresión logística, árbol de
 decisión y bosque aleatorio, validación cruzada agrupada por escenario y evaluación en

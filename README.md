@@ -32,12 +32,18 @@ Kotlin y Jetpack Compose; el servicio local usa Python, FastAPI y PostgreSQL.
   agregados. Las categorías del relé se infieren por puerto de destino.
 - Presenta evaluación basada en reglas, calidad de muestra e indicaciones preventivas.
 - Permite consultar, filtrar, borrar y compartir resúmenes del historial.
+- Exporta las métricas de capturas completas adecuadas a un CSV sin identificadores
+  ni etiquetas automáticas, para preparar el conjunto supervisado.
 - Incluye un flujo supervisado para entrenar y evaluar un modelo con capturas autorizadas.
 
 La evaluación es orientativa: no inspecciona contenido y no confirma por sí sola una
 amenaza. Hasta contar con datos autorizados y etiquetados, el backend mantiene sus
 reglas versionadas. No hay un modelo entrenado incluido ni activo por defecto. La
 captura completa actual solo enruta IPv4.
+
+El alcance acordado del aplicativo es evaluar riesgos observables desde el celular:
+su conexión y el tráfico propio que pasa por el túnel. No se requiere un sensor
+externo y no se observa la red pública completa ni el tráfico de otros usuarios.
 
 ## Documentación
 

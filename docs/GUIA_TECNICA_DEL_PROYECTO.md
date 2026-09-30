@@ -332,8 +332,17 @@ paquetes del túnel.
 El proyecto de investigación plantea observar pasivamente la red Wi-Fi pública de
 MegaPlaza, pero la app actual analiza el tráfico del propio teléfono que Android enruta
 por `VpnService`; no captura tramas 802.11 ni observa a los demás usuarios del punto de
-acceso. Esa diferencia debe resolverse con el asesor antes de presentar una prueba de
-campo como validación del objetivo original.
+acceso. Se acordó mantener el celular como única fuente de captura, sin sensor externo,
+y evaluar riesgos observables desde su conexión y tráfico propio. El documento de tesis
+no se modifica por ahora; las futuras correcciones de alcance deben revisarse con el asesor.
+
+El historial permite exportar una sesión completa adecuada a un CSV con los campos
+de entrenamiento. El backend verifica la instalación propietaria y usa una lista
+explícita de métricas, excluyendo SSID, fechas, UUID, predicciones y contenido.
+Android usa el selector de documentos para que el usuario decida dónde guardarlo;
+no requiere acceso general al almacenamiento. El escenario, la partición y la
+etiqueta de referencia quedan vacíos. Exportar no entrena el modelo: primero hay
+que completar el conjunto con referencias independientes y escenarios separados.
 
 ## 10. Próximas etapas
 
@@ -344,9 +353,9 @@ campo como validación del objetivo original.
 3. Preparar el conjunto supervisado desde escenarios autorizados: fijar los niveles de
    referencia, registrar capturas adecuadas, separar escenarios completos en training y
    test, y revisar las métricas del clasificador.
-4. Acordar con el asesor cómo resolver la diferencia entre analizar el tráfico del
-   teléfono y capturar pasivamente la red pública completa. El backend actual requiere
-   que el teléfono alcance la PC y no observa al resto de usuarios.
+4. Revisar con el asesor las futuras correcciones del documento al alcance acordado:
+   analizar el tráfico propio del teléfono. El backend actual requiere que el
+   teléfono alcance la PC y no observa al resto de usuarios.
 5. Acordar cómo estará disponible el backend durante la evaluación; el servicio actual
    no está preparado para exponerse directamente en una red pública.
 6. Obtener los permisos del centro comercial y las aprobaciones institucionales antes
