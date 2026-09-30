@@ -121,8 +121,8 @@ No se registran cuerpos ni claves en los logs HTTP. El estado `received` confirm
 la persistencia. Las consultas nuevas incluyen `risk_level`, `risk_reasons` y el
 alcance de la evaluación. En modo `full`, el riesgo combina la seguridad informada
 por Android con señales agregadas del túnel; un volumen de salida predominante puede
-elevar una evaluación baja a media para revisión. La clasificación actual usa reglas
-explícitas y todavía no utiliza aprendizaje automático.
+elevar una evaluación baja a media para revisión. El backend usa reglas explícitas,
+salvo que exista un artefacto supervisado compatible y habilitado en `data/models/`.
 Las respuestas de guardado y del historial incluyen `recommendations`, una lista de
 acciones preventivas calculada a partir del nivel, la calidad de muestra, la seguridad
 de la red, el portal cautivo y los indicadores. Estas recomendaciones orientan al
@@ -133,6 +133,41 @@ los registros sin información suficiente y los registros históricos no evaluad
 También agrega las observaciones del relé de las capturas completas: transporte,
 categorías inferidas por puerto y la suma de destinos distintos dentro de cada sesión.
 No devuelve direcciones ni permite identificar el contenido visitado.
+
+## Clasificador supervisado experimental
+
+La propuesta de investigación requiere clasificación supervisada. El repositorio ya
+incluye la validación de un CSV, la comparación de regresión logística, árbol de
+decisión y bosque aleatorio, validación cruzada agrupada por escenario y evaluación en
+una partición de test separada. El modelo se activa solo cuando supera en F1 macro a una
+línea base que siempre predice la clase más frecuente. Sin un CSV válido, con una muestra
+insuficiente o sin un artefacto habilitado, el sistema sigue usando las reglas actuales
+y no cambia el contrato Android/backend.
+
+La plantilla está en `backend/data/templates/risk_observations_template.csv`. Prepara
+`backend/data/observations/risk_observations.csv` solo con escenarios controlados y
+autorizados. Cada fila representa una captura completa, con al menos 30 segundos y 100
+paquetes. Asigna `reference_risk_level` usando los criterios de referencia antes de
+consultar la predicción; no copies el riesgo calculado por las reglas como etiqueta. Cada
+`scenario_id` debe permanecer por completo en training o en test. El conjunto debe
+contener los tres niveles, al menos cinco escenarios distintos por nivel en training y
+dos en test. La guía de datos contiene el esquema y las condiciones de privacidad; la
+salida actual clasifica sesiones agregadas, no amenazas individuales.
+
+Desde la raíz del proyecto, el entrenamiento se ejecuta con:
+
+```powershell
+.\backend\.venv\Scripts\python.exe -m pip install scikit-learn==1.9.1
+.\backend\.venv\Scripts\python.exe .\backend\train_risk_model.py .\backend\data\observations\risk_observations.csv
+```
+
+El proceso guarda localmente un modelo y su manifiesto en `backend/data/models/`, ambos
+excluidos de Git. El manifiesto conserva la huella del conjunto, la versión de
+scikit-learn, métricas por clase y matriz de confusión del test separado. Después de
+entrenar, reinicia el backend. Solo las capturas completas con al menos 30 segundos,
+100 paquetes y métricas del relé pueden usar el modelo. Las demás continúan con las
+reglas. Estas métricas no reemplazan el pretest/postest con Suricata ni prueban el
+desempeño en una red real.
 GET /api/v1/analysis-sessions acepta los filtros opcionales `risk_level` (`low`,
 `medium`, `high` o `unknown`) y `capture_mode` (`controlled` o `full`). Los filtros
 se mantienen durante la paginación y solo consultan la instalación autenticada.
@@ -152,13 +187,15 @@ Si los servicios se reiniciaron antes de que Android pudiera recuperar la instan
 el reintento guarda la captura completa con sus métricas agregadas y declara
 `relay_metrics_collected=false`; la ausencia del dato no se representa como un conteo
 observado de cero.
-Cada sesión guarda `assessment_version`, que identifica la versión de reglas utilizada
-para producir su evaluación. La migración marca como `legacy` los resultados calculados
-antes de incorporar este versionado; no vuelve a calcular ni altera su nivel original.
+Cada sesión guarda `assessment_version`, que identifica la versión de reglas o del modelo
+supervisado utilizado para producir su evaluación. La migración marca como `legacy` los
+resultados calculados antes de incorporar este versionado; no vuelve a calcular ni altera
+su nivel original.
 Las sesiones que incorporaron la señal de portal cautivo usan `rules-aggregate-v2`.
 Las capturas completas con observaciones del relé usan `rules-relay-v3`. Las sesiones
 sin esas observaciones continúan con `rules-aggregate-v2`. Las sesiones anteriores
-permanecen sin cambios.
+permanecen sin cambios. Cuando hay un modelo ML habilitado, la versión usa el prefijo
+`ml-` y un identificador derivado de la huella del conjunto de entrenamiento.
 Las sesiones nuevas también guardan `captive_portal`, tomado del estado de red que
 Android informa al iniciar la captura. La evaluación lo describe como una condición
 que requiere autenticación y no como prueba de que la red sea maliciosa. Los registros

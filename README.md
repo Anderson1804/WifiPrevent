@@ -32,11 +32,12 @@ Kotlin y Jetpack Compose; el servicio local usa Python, FastAPI y PostgreSQL.
   agregados. Las categorías del relé se infieren por puerto de destino.
 - Presenta evaluación basada en reglas, calidad de muestra e indicaciones preventivas.
 - Permite consultar, filtrar, borrar y compartir resúmenes del historial.
+- Incluye un flujo supervisado para entrenar y evaluar un modelo con capturas autorizadas.
 
 La evaluación es orientativa: no inspecciona contenido y no confirma por sí sola una
-amenaza. El clasificador actual usa reglas; todavía no hay un modelo de aprendizaje
-automático ni un conjunto de datos etiquetado validado. La captura completa actual
-solo enruta IPv4.
+amenaza. Hasta contar con datos autorizados y etiquetados, el backend mantiene sus
+reglas versionadas. No hay un modelo entrenado incluido ni activo por defecto. La
+captura completa actual solo enruta IPv4.
 
 ## Documentación
 

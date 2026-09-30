@@ -98,9 +98,12 @@ WifiPrevent/
 │  │  ├─ core/              identidad y reglas comunes
 │  │  ├─ db/                conexión y modelos SQLAlchemy
 │  │  ├─ schemas/           contratos Pydantic
-│  │  └─ services/          evaluación de riesgo e indicadores
+│  │  └─ services/          reglas, ML opcional, indicadores y recomendaciones
 │  ├─ migrations/           historial de cambios de base de datos
 │  ├─ tests/                pruebas automatizadas
+│  ├─ data/templates/       esquema CSV sin datos personales
+│  ├─ data/models/          artefacto ML local (ignorado por Git)
+│  ├─ train_risk_model.py   compara, valida y entrena clasificadores
 │  ├─ local_services.py     inicia y detiene servicios locales
 │  └─ socks5_relay.py       transporte de desarrollo
 └─ docs/                    documentación del proyecto
@@ -215,10 +218,12 @@ los datos agregados, sin direcciones de destino ni contenido del tráfico.
    disponible.
 9. `BackendClient` construye JSON y lo envía por HTTP.
 10. Pydantic valida el contrato.
-11. Los servicios Python calculan riesgo, razones, indicadores, recomendaciones y
-    calidad de muestra.
-12. SQLAlchemy inserta la sesión y PostgreSQL confirma la transacción.
-13. FastAPI devuelve el recibo y la app muestra el resultado. Si el envío falla, se
+11. El backend usa un modelo supervisado local solo si el artefacto coincide con su
+    manifiesto y la captura completa tiene métricas válidas y una muestra adecuada;
+    en cualquier otro caso conserva la evaluación por reglas.
+12. Los servicios Python preparan indicadores, recomendaciones y calidad de muestra.
+13. SQLAlchemy inserta la sesión y PostgreSQL confirma la transacción.
+14. FastAPI devuelve el recibo y la app muestra el resultado. Si el envío falla, se
     puede reintentar con el mismo UUID para evitar duplicados.
 
 ## 7. Kotlin explicado desde la base
@@ -312,15 +317,23 @@ compilaciones de desarrollo. Antes de publicar se requieren HTTPS, cuentas o
 autenticación robusta, política de conservación y un backend desplegado de manera
 segura.
 
-La evaluación usa reglas explícitas y versionadas; no se ha implementado aprendizaje
-automático ni se ha validado un conjunto de datos etiquetado. La captura completa
-enruta IPv4; IPv6 queda fuera de ese túnel. Las categorías de protocolo del relé son
-inferencias por puerto de destino y no equivalen a inspección del contenido. El relé
-cuenta destinos únicos mediante HMAC con una clave aleatoria que desaparece al reiniciar
-el proceso; solo se conserva el total. Si Android recuperó la instantánea, guarda sus
-métricas localmente para permitir el reintento aunque se reinicien los servicios. La
-comunicación de control del relé usa `127.0.0.1:1081`; PostgreSQL conserva por separado
-conexiones TCP, datagramas UDP y paquetes del túnel.
+La evaluación usa reglas explícitas y versionadas mientras no exista un artefacto
+supervisado compatible. El repositorio ya incluye la validación, comparación y
+evaluación separada necesarias para entrenarlo, pero todavía no hay observaciones
+autorizadas etiquetadas ni un modelo activo. La captura completa enruta IPv4; IPv6 queda
+fuera de ese túnel. Las categorías de protocolo del relé son inferencias por puerto de
+destino y no equivalen a inspección del contenido. El relé cuenta destinos únicos mediante
+HMAC con una clave aleatoria que desaparece al reiniciar el proceso; solo se conserva el
+total. Si Android recuperó la instantánea, guarda sus métricas localmente para permitir
+el reintento aunque se reinicien los servicios. La comunicación de control del relé usa
+`127.0.0.1:1081`; PostgreSQL conserva por separado conexiones TCP, datagramas UDP y
+paquetes del túnel.
+
+El proyecto de investigación plantea observar pasivamente la red Wi-Fi pública de
+MegaPlaza, pero la app actual analiza el tráfico del propio teléfono que Android enruta
+por `VpnService`; no captura tramas 802.11 ni observa a los demás usuarios del punto de
+acceso. Esa diferencia debe resolverse con el asesor antes de presentar una prueba de
+campo como validación del objetivo original.
 
 ## 10. Próximas etapas
 
@@ -328,15 +341,25 @@ conexiones TCP, datagramas UDP y paquetes del túnel.
    local y el reintento después de reiniciar los servicios.
 2. Probar sesiones largas, cambios de Wi-Fi, estabilidad, batería y memoria en el Honor
    400 Lite.
-3. Definir si el alcance académico requiere ML. Si se incluye, preparar datos autorizados
-   y etiquetados, separar entrenamiento y prueba, y medir precisión, exhaustividad, F1 y
-   falsos positivos. Hasta entonces el prototipo usa reglas.
-4. Acordar cómo estará disponible el backend durante una evaluación en un lugar público;
-   el servicio actual requiere que el teléfono alcance la PC y no está preparado para
-   exponerse directamente en una red pública.
-5. Preparar HTTPS, autenticación y despliegue seguro únicamente si el alcance final lo
+3. Preparar el conjunto supervisado desde escenarios autorizados: fijar los niveles de
+   referencia, registrar capturas adecuadas, separar escenarios completos en training y
+   test, y revisar las métricas del clasificador.
+4. Acordar con el asesor cómo resolver la diferencia entre analizar el tráfico del
+   teléfono y capturar pasivamente la red pública completa. El backend actual requiere
+   que el teléfono alcance la PC y no observa al resto de usuarios.
+5. Acordar cómo estará disponible el backend durante la evaluación; el servicio actual
+   no está preparado para exponerse directamente en una red pública.
+6. Obtener los permisos del centro comercial y las aprobaciones institucionales antes
+   de capturar datos reales.
+7. Preparar el protocolo de prueba: escenarios, repeticiones, controles y criterios de
+   referencia, sin generar tráfico fuera de una red controlada.
+8. Ejecutar pruebas prolongadas en el Honor 400 Lite y documentar fallos, batería,
+   cambios de red, IPv6 y la interrupción breve que puede causar el túnel VPN.
+9. Comparar el pretest con Suricata y el postest con la app; analizar los resultados con
+   pruebas estadísticas acordes con la distribución de las mediciones.
+10. Preparar HTTPS, autenticación y despliegue seguro únicamente si el alcance final lo
    requiere.
-6. Documentar el protocolo de evaluación, resultados, limitaciones y evidencias para el
+11. Documentar el protocolo de evaluación, resultados, limitaciones y evidencias para el
    informe y la sustentación.
 
 ## 11. Comandos habituales
