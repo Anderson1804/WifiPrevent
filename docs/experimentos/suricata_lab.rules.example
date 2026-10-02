@@ -1,0 +1,4 @@
+# Plantilla de laboratorio. Sustituir 192.0.2.10 por el receptor privado autorizado.
+# Detecta un conteo de SYN, no confirma abuso ni mide conexiones TCP exitosas.
+# Revisar retransmisiones y conexiones realmente recibidas antes de comparar.
+alert tcp any any -> 192.0.2.10 8765 (msg:"WiFiPrevent LAB burst pattern"; flags:S; threshold:type both,track by_src,count 20,seconds 10; sid:1000001; rev:1;)

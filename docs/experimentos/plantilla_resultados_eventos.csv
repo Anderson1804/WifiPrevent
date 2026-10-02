@@ -1,0 +1,1 @@
+execution_id,mechanism,phase,detection_id,reference_event_id,detected_at_utc,event_type,assigned_risk_level,model_or_rules_version,matching_protocol_version,matching_status,is_duplicate,is_false_alarm,risk_matches_reference,evidence_code

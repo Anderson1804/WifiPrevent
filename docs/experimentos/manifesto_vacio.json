@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "data_kind": "pilot",
+  "matching_tolerance_ms": 1000,
+  "risk_rubric_version": "pendiente-de-definir",
+  "executions": []
+}

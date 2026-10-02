@@ -49,6 +49,8 @@ externo y no se observa la red pública completa ni el tráfico de otros usuario
 
 - [Guía técnica, arquitectura y explicación de Kotlin/Python](docs/GUIA_TECNICA_DEL_PROYECTO.md)
 - [Auditoría de interfaz y comprobaciones de navegación](docs/AUDITORIA_UI.md)
+- [Escenarios experimentales y plantillas del anexo 2](docs/experimentos/README.md)
+- [Implementación, laboratorio, ML y evaluación del anexo 2](docs/experimentos/IMPLEMENTACION.md)
 - [Configuración local, PostgreSQL, teléfono, API y pruebas del backend](backend/README.md)
 - [Uso y licencia de hev-socks5-tunnel](docs/third-party/hev-socks5-tunnel.md)
 

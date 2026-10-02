@@ -1,0 +1,13 @@
+scenario_code,name,role,matched_control,reference_status,current_visibility,required_evidence,decision_status
+S00,Reposo sin actividad deliberada,normal_control,,normal_control,partial_background_counts,Registro de inicio y fin y actividad de fondo,pilot_not_run
+S01,Navegacion HTTPS legitima,normal_control,,normal_control,aggregate_volume_and_ports,Acciones propias ejecutadas y recepcion del servicio,pilot_not_run
+S02,Descarga legitima,normal_control,,normal_control,aggregate_inbound_volume,Bytes recibidos verificados por el receptor,pilot_not_run
+S03,Subida legitima,normal_control,,normal_control,aggregate_outbound_volume,Bytes enviados verificados por el receptor,pilot_not_run
+S04,Rafaga legitima,normal_control,S06,normal_control,aggregate_only_no_timing,Conexiones exitosas con tiempos y finalidad legitima,pilot_not_run
+S05,Sondeo periodico legitimo,normal_control,S07,normal_control,aggregate_only_no_timing,Tiempos de conexiones y finalidad legitima,pilot_not_run
+S06,Rafaga de abuso simulado,candidate_detection,S04|S08,candidate_simulation,not_discriminable_yet,Tiempos y confirmacion independiente del evento acotado,pilot_not_run
+S07,Imitacion de beacon periodico,candidate_detection,S05,candidate_simulation,not_discriminable_yet,Tiempos y evidencia adicional para distinguir finalidad,pilot_not_run
+S08,Conexiones distribuidas con igual total,normal_control,S06,normal_control,aggregate_only_no_timing,Tiempos y comprobacion del total equivalente,pilot_not_run
+S09,HTTP legitimo en destino propio,exposure_control,,normal_control,port_80_only,Puerto del servicio conocido y actividad legitima,pilot_not_run
+S10,Seguridad distinta en redes propias,exposure_control,S01,normal_control,android_security_if_available,Configuracion conocida de red y misma actividad,pilot_not_run
+S11,Desconexion y reconexion,functional_control,,functional_control,session_and_save_state,Registro de interrupcion y recuperacion del guardado,pilot_not_run

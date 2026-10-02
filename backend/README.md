@@ -1,5 +1,12 @@
 # WiFiPrevent local con PostgreSQL
 
+El módulo experimental añade mediciones temporales, eventos observados, exportación,
+entrenamiento y evaluación pretest/postest. Consultar la
+[guía del laboratorio](../docs/experimentos/IMPLEMENTACION.md) para el contrato nuevo,
+las migraciones y las comprobaciones pendientes. La descripción del prototipo agregado
+que sigue corresponde a la base anterior; el módulo temporal amplía esos contadores
+sin convertirlos en pruebas concluyentes de amenazas.
+
 ## Iniciar después de reiniciar la PC
 
 Desde la terminal de Android Studio, en la raíz del proyecto:
