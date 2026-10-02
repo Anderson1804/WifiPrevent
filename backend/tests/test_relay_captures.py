@@ -14,12 +14,12 @@ def test_relay_capture_starts_and_returns_aggregate_metrics(client, headers, mon
     monkeypatch.setattr(
         relay_captures,
         "start_relay_session",
-        lambda value: {"session_id": str(value), "status": "ready"},
+        lambda value, owner: {"session_id": str(value), "status": "ready"},
     )
     monkeypatch.setattr(
         relay_captures,
         "read_relay_session",
-        lambda value: {
+        lambda value, owner: {
             "session_id": str(value),
             "tcp_connections": 3,
             "udp_datagrams": 5,
