@@ -18,6 +18,7 @@ from app.schemas.analysis_session import (
     AnalysisTrainingObservation,
 )
 from app.services.ml_risk_classifier import FEATURE_NAMES
+from app.services.temporal_event_evaluator import evaluate_temporal_events, export_event_observations, assess_temporal_windows
 from app.services.training_observation_exporter import export_training_observation
 from app.services import (
     ASSESSMENT_VERSION,
@@ -54,6 +55,39 @@ def training_observation(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
     return AnalysisTrainingObservation(csv_content=csv_content)
+
+
+@router.get("/{session_id}/experiment-observation", response_model=AnalysisTrainingObservation)
+def experiment_observation(session_id: UUID, session: DatabaseSession, owner: OwnerHash, response: Response):
+    import json
+    record = session.scalar(select(AnalysisSessionRecord).where(
+        AnalysisSessionRecord.session_id == session_id, AnalysisSessionRecord.owner_hash == owner))
+    if record is None:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada.")
+    if record.temporal_capture is None:
+        raise HTTPException(status_code=422, detail="Esta sesión no contiene observaciones temporales.")
+    response.headers["Cache-Control"] = "no-store"
+    return AnalysisTrainingObservation(csv_content=json.dumps({"schema_version": 1,
+        "temporal_capture": record.temporal_capture, "detected_events": record.detected_events,
+        "window_assessments": record.window_assessments,
+        "interpretation": "Patrones observados; referencias experimentales pendientes."}, ensure_ascii=False))
+
+
+@router.get("/{session_id}/event-observations", response_model=AnalysisTrainingObservation)
+def event_observations(session_id: UUID, session: DatabaseSession, owner: OwnerHash, response: Response):
+    record = session.scalar(select(AnalysisSessionRecord).where(
+        AnalysisSessionRecord.session_id == session_id, AnalysisSessionRecord.owner_hash == owner))
+    if record is None:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada.")
+    if record.temporal_capture is None:
+        raise HTTPException(status_code=422, detail="Esta sesión no contiene observaciones temporales.")
+    from app.schemas.temporal_capture import TemporalCapture
+    try:
+        content = export_event_observations(TemporalCapture.model_validate(record.temporal_capture))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return AnalysisTrainingObservation(csv_content=content)
 
 
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -141,6 +175,8 @@ def save_analysis_session(
         transmitted_packets=reading.transmitted_packets,
         ml_features=values,
     )
+    events = evaluate_temporal_events(reading.temporal_capture)
+    windows = assess_temporal_windows(reading.temporal_capture)
     indicators = evaluate_traffic_indicators(
         capture_mode=reading.capture_mode,
         duration_seconds=reading.duration_seconds,
@@ -172,6 +208,8 @@ def save_analysis_session(
             owner_hash=owner,
             received_at=datetime.now(timezone.utc),
             **values,
+            detected_events=[event.model_dump() for event in events],
+            window_assessments=windows,
             risk_level=assessment.level,
             risk_reasons=list(assessment.reasons),
             assessment_scope=(
@@ -212,6 +250,9 @@ def save_analysis_session(
 
     session.commit()
     return AnalysisSessionReceipt(
+        temporal_capture=row.temporal_capture,
+        detected_events=row.detected_events,
+        window_assessments=row.window_assessments,
         session_id=row.session_id,
         received_at=row.received_at,
         risk_level=row.risk_level,

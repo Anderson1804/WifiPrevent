@@ -3,6 +3,7 @@ from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from app.schemas.temporal_capture import TemporalCapture, DetectedEvent
 
 
 class AnalysisSessionReading(BaseModel):
@@ -39,9 +40,18 @@ class AnalysisSessionReading(BaseModel):
     relay_other_observations: int = Field(default=0, ge=0)
     relay_unique_destinations: int = Field(default=0, ge=0)
     capture_mode: Literal["controlled", "full"] = "controlled"
+    temporal_capture: TemporalCapture | None = None
 
     @model_validator(mode="after")
     def validate_relay_metrics(self):
+        if self.temporal_capture is not None:
+            if self.capture_mode != "full" or not self.relay_metrics_collected:
+                raise ValueError("temporal observations require full relay capture")
+            if not self.temporal_capture.truncated:
+                tcp = sum(r.transport == "tcp" and r.success for r in self.temporal_capture.observations)
+                udp = sum(r.transport == "udp" for r in self.temporal_capture.observations)
+                if tcp != self.relay_tcp_connections or udp != self.relay_udp_datagrams:
+                    raise ValueError("temporal observations must match relay counters")
         relay_values = (
             self.relay_tcp_connections,
             self.relay_udp_datagrams,
@@ -100,6 +110,9 @@ class AnalysisSessionReceipt(BaseModel):
     relay_other_observations: int = 0
     relay_unique_destinations: int = 0
     message: str = "La sesión de análisis se guardó correctamente."
+    temporal_capture: TemporalCapture | None = None
+    detected_events: list[DetectedEvent] = Field(default_factory=list)
+    window_assessments: list[dict] = Field(default_factory=list)
 
 
 class AnalysisSessionItem(BaseModel):
@@ -146,6 +159,10 @@ class AnalysisSessionItem(BaseModel):
     indicators: list[TrafficIndicatorSchema] = Field(default_factory=list)
     sample_quality: Literal["insufficient", "limited", "adequate"] = "insufficient"
     recommendations: list[str] = Field(default_factory=list)
+
+    temporal_capture: TemporalCapture | None = None
+    detected_events: list[DetectedEvent] = Field(default_factory=list)
+    window_assessments: list[dict] = Field(default_factory=list)
 
 
 class AnalysisSessionPage(BaseModel):

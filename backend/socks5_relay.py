@@ -11,6 +11,8 @@ import json
 import logging
 import secrets
 import socket
+import time
+from datetime import datetime, timezone
 from uuid import UUID
 
 
@@ -27,12 +29,13 @@ class RelayMetricsSnapshot:
     tls_or_quic_observations: int
     other_observations: int
     unique_destinations: int
+    temporal_capture: dict | None = None
 
 
 class RelayTrafficMetrics:
     """Keep aggregate forwarding observations without retaining destinations."""
 
-    def __init__(self, fingerprint_key: bytes | None = None):
+    def __init__(self, fingerprint_key: bytes | None = None, clock=time.monotonic):
         self._fingerprint_key = fingerprint_key or secrets.token_bytes(32)
         self._tcp_connections = 0
         self._udp_datagrams = 0
@@ -42,9 +45,24 @@ class RelayTrafficMetrics:
         self._other_observations = 0
         self._destination_fingerprints: set[bytes] = set()
         self._session_id: str | None = None
+        self._clock = clock
+        self._started = clock()
+        self._started_at = None
+        self._timeline: list[dict] = []
+        self._groups: dict[bytes, int] = {}
+        self._dropped = 0
+        self._epoch = 0
+        self._capture_owner = None
 
     def start_session(self, session_id: str) -> None:
         self._session_id = str(UUID(session_id))
+        self._epoch += 1
+        self._started = self._clock()
+        self._started_at = datetime.now(timezone.utc).isoformat()
+        self._timeline.clear()
+        self._groups.clear()
+        self._dropped = 0
+        self._fingerprint_key = secrets.token_bytes(32)
         self._tcp_connections = 0
         self._udp_datagrams = 0
         self._dns_observations = 0
@@ -53,7 +71,35 @@ class RelayTrafficMetrics:
         self._other_observations = 0
         self._destination_fingerprints.clear()
 
-    def observe(self, transport: str, host: str, port: int) -> None:
+    @property
+    def epoch(self):
+        return self._epoch
+
+    def _temporal(self, transport, host, port, success):
+        if self._started_at is None:
+            return
+        elapsed = max(0, int((self._clock() - self._started) * 1000))
+        if len(self._timeline) >= 2048 or elapsed > 3_600_000:
+            self._dropped += 1
+            return
+        fingerprint = hmac.new(self._fingerprint_key, host.rstrip(".").lower().encode(), hashlib.sha256).digest()
+        if fingerprint not in self._groups:
+            if len(self._groups) >= 4096:
+                self._dropped += 1
+                return
+            self._groups[fingerprint] = len(self._groups) + 1
+        category = "dns" if port == 53 else "http" if port == 80 and transport == "tcp" else "tls_quic" if port == 443 else "other"
+        self._timeline.append(dict(offset_ms=elapsed, transport=transport, category=category,
+                                   destination_group=self._groups[fingerprint], success=success))
+
+    def failed_tcp(self, host, port, epoch=None):
+        if epoch is not None and epoch != self._epoch:
+            return
+        self._temporal("tcp", host, port, False)
+
+    def observe(self, transport: str, host: str, port: int, epoch=None) -> None:
+        if epoch is not None and epoch != self._epoch:
+            return
         if transport == "tcp":
             self._tcp_connections += 1
         elif transport == "udp":
@@ -76,7 +122,11 @@ class RelayTrafficMetrics:
             normalized_host.encode("utf-8", errors="replace"),
             hashlib.sha256,
         ).digest()
-        self._destination_fingerprints.add(fingerprint)
+        if len(self._destination_fingerprints) < 4096:
+            self._destination_fingerprints.add(fingerprint)
+        elif fingerprint not in self._destination_fingerprints:
+            self._dropped += 1
+        self._temporal(transport, host, port, True)
 
     def snapshot(self) -> RelayMetricsSnapshot:
         return RelayMetricsSnapshot(
@@ -87,6 +137,10 @@ class RelayTrafficMetrics:
             tls_or_quic_observations=self._tls_or_quic_observations,
             other_observations=self._other_observations,
             unique_destinations=len(self._destination_fingerprints),
+            temporal_capture=(dict(version=1, started_at_utc=self._started_at,
+                elapsed_ms=min(3_600_000, max(0, int((self._clock() - self._started) * 1000))),
+                truncated=self._dropped > 0 or self._clock() - self._started > 3600, dropped_observations=self._dropped,
+                observations=list(self._timeline)) if self._started_at is not None else None),
         )
 
     def session_snapshot(self, session_id: str) -> RelayMetricsSnapshot | None:
@@ -106,7 +160,7 @@ async def send_http_json(
         payload: dict,
 ) -> None:
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    reason = {200: "OK", 201: "Created", 400: "Bad Request", 404: "Not Found"}[status]
+    reason = {200: "OK", 201: "Created", 400: "Bad Request", 404: "Not Found", 409: "Conflict"}[status]
     writer.write(
         f"HTTP/1.1 {status} {reason}\r\n"
         f"Content-Type: application/json\r\n"
@@ -136,11 +190,25 @@ async def handle_control_client(
             await send_http_json(writer, 404, {"detail": "not found"})
             return
         session_id = str(UUID(parts[1]))
+        owner_headers = [line.split(b":", 1)[1].strip().decode("ascii") for line in header.split(b"\r\n")[1:]
+                         if line.lower().startswith(b"x-capture-owner:")]
+        capture_owner = owner_headers[0] if len(owner_headers) == 1 else None
+        if capture_owner is not None and (len(capture_owner) != 64 or any(c not in "0123456789abcdef" for c in capture_owner)):
+            await send_http_json(writer, 400, {"detail": "invalid owner"})
+            return
         if method == "POST" and parts[2:] == ["start"]:
+            if (metrics._capture_owner is not None and capture_owner != metrics._capture_owner
+                    and metrics._clock() - metrics._started < 3600):
+                await send_http_json(writer, 409, {"detail": "capture in use"})
+                return
             metrics.start_session(session_id)
+            metrics._capture_owner = capture_owner
             await send_http_json(writer, 201, {"session_id": session_id, "status": "ready"})
             return
         if method == "GET" and len(parts) == 2:
+            if capture_owner != metrics._capture_owner:
+                await send_http_json(writer, 404, {"detail": "session not active"})
+                return
             snapshot = metrics.session_snapshot(session_id)
             if snapshot is None:
                 await send_http_json(writer, 404, {"detail": "session not active"})
@@ -243,6 +311,7 @@ class UdpAssociation(asyncio.DatagramProtocol):
     def __init__(self, allowed_client_host: str, metrics: RelayTrafficMetrics):
         self.allowed_client_host = allowed_client_host
         self.metrics = metrics
+        self.epoch = metrics.epoch
         self.client = None
         self.transport = None
 
@@ -258,7 +327,7 @@ class UdpAssociation(asyncio.DatagramProtocol):
                 return
             self.client = address
             host, port, payload = request
-            self.metrics.observe("udp", host, port)
+            self.metrics.observe("udp", host, port, self.epoch)
             self.transport.sendto(payload, (host, port))
             return
         if self.client is not None:
@@ -319,16 +388,18 @@ async def handle_client(
                 transport.close()
             return
 
+        capture_epoch = metrics.epoch
         try:
             upstream_reader, upstream_writer = await asyncio.wait_for(
                 asyncio.open_connection(host, port), timeout=10
             )
         except (OSError, asyncio.TimeoutError):
+            metrics.failed_tcp(host, port, capture_epoch)
             await send_reply(writer, 5)
             return
 
         await send_reply(writer, 0, upstream_writer.get_extra_info("sockname"))
-        metrics.observe("tcp", host, port)
+        metrics.observe("tcp", host, port, capture_epoch)
         LOGGER.info("Conexión TCP reenviada")
         tasks = {
             asyncio.create_task(copy_stream(reader, upstream_writer)),

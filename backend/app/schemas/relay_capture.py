@@ -2,6 +2,7 @@ from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+from app.schemas.temporal_capture import TemporalCapture
 
 
 class RelayCaptureReady(BaseModel):
@@ -18,3 +19,5 @@ class RelayCaptureMetrics(BaseModel):
     tls_or_quic_observations: int = Field(ge=0)
     other_observations: int = Field(ge=0)
     unique_destinations: int = Field(ge=0)
+
+    temporal_capture: TemporalCapture | None = None
