@@ -7,3 +7,6 @@ data/observations/*.csv
 data/models/*.joblib
 data/models/*.json
 .env
+
+data/event_models/
+data/experiments/
