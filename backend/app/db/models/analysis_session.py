@@ -71,3 +71,6 @@ class AnalysisSessionRecord(Base):
     traffic_analysis_performed: Mapped[bool] = mapped_column(Boolean, default=False)
     capture_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="controlled")
     indicators: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
+    temporal_capture: Mapped[dict | None] = mapped_column(JSON)
+    detected_events: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
+    window_assessments: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
