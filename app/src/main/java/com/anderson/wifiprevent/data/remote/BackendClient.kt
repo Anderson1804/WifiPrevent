@@ -11,6 +11,8 @@ import com.anderson.wifiprevent.domain.model.AnalysisHistoryEntry
 import com.anderson.wifiprevent.domain.model.AnalysisHistorySummary
 import com.anderson.wifiprevent.domain.model.AnalysisHistoryPage
 import com.anderson.wifiprevent.domain.model.TrafficMetrics
+import com.anderson.wifiprevent.domain.model.TemporalCapture
+import com.anderson.wifiprevent.domain.model.detectedEvents
 import com.anderson.wifiprevent.domain.model.RelayCaptureMetrics
 import com.anderson.wifiprevent.domain.traffic.TrafficMetadataSummary
 import com.anderson.wifiprevent.domain.model.TrafficIndicator
@@ -185,12 +187,15 @@ class BackendClient(context: Context) {
                 put("relay_other_observations", session.relayMetrics.otherObservations)
                 put("relay_unique_destinations", session.relayMetrics.uniqueDestinations)
                 put("capture_mode", session.captureMode.apiValue)
+                put("temporal_capture", session.relayMetrics.temporalCapture?.toJson() ?: JSONObject.NULL)
             }.toString()
             val reply = request("POST", "/api/v1/analysis-sessions", payload)
             require(reply.getString("status") == "completed") {
                 "El servidor devolvió una respuesta inesperada para la sesión."
             }
             AnalysisReceipt(
+                temporalCapture = TemporalCapture.fromJson(reply.optJSONObject("temporal_capture")),
+                detectedEvents = reply.detectedEvents(),
                 sessionId = reply.getString("session_id"),
                 message = reply.getString("message"),
                 riskLevel = reply.nullableString("risk_level"),
@@ -233,6 +238,8 @@ class BackendClient(context: Context) {
             val entries = (0 until array.length()).map { index ->
                 val row = array.getJSONObject(index)
                 AnalysisHistoryEntry(
+                    temporalCapture = TemporalCapture.fromJson(row.optJSONObject("temporal_capture")),
+                    detectedEvents = row.detectedEvents(),
                     id = row.getString("session_id"),
                     receivedAt = row.getString("received_at"),
                     ssid = row.nullableString("ssid"),
@@ -283,10 +290,12 @@ class BackendClient(context: Context) {
             AnalysisHistoryPage(entries, response.nullableString("next_before"))
         }
 
-    suspend fun trainingObservationCsv(sessionId: String): String = withContext(Dispatchers.IO) {
+    suspend fun trainingObservationCsv(sessionId: String, temporal: Boolean = false, experiment: Boolean = false): String = withContext(Dispatchers.IO) {
         val response = request(
-            "GET", "/api/v1/analysis-sessions/${UUID.fromString(sessionId)}/training-observation",
-            validationFailureMessage = "Esta sesión no tiene una muestra compatible para exportar. " +
+            "GET", "/api/v1/analysis-sessions/${UUID.fromString(sessionId)}/${if (experiment) "experiment-observation" else if (temporal) "event-observations" else "training-observation"}",
+            validationFailureMessage = if (experiment) "Esta sesión no contiene un registro temporal exportable."
+                else if (temporal) "El CSV temporal requiere una serie completa de al menos 30 segundos."
+                else "Esta sesión no tiene una muestra compatible para exportar. " +
                     "Realiza una captura completa de al menos 30 segundos, 100 paquetes " +
                     "y observaciones del relé disponibles."
         )
@@ -342,7 +351,8 @@ class BackendClient(context: Context) {
                 httpObservations = reply.getLong("http_observations"),
                 tlsOrQuicObservations = reply.getLong("tls_or_quic_observations"),
                 otherObservations = reply.getLong("other_observations"),
-                uniqueDestinations = reply.getInt("unique_destinations")
+                uniqueDestinations = reply.getInt("unique_destinations"),
+                temporalCapture = TemporalCapture.fromJson(reply.optJSONObject("temporal_capture"))
             )
         }
 

@@ -187,7 +187,13 @@ class MainActivity : ComponentActivity() {
 
     private val trainingCsvDocument = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri ->
+    ) { uri -> saveExperimentDocument(uri) }
+
+    private val experimentJsonDocument = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> saveExperimentDocument(uri) }
+
+    private fun saveExperimentDocument(uri: android.net.Uri?) {
         val csv = pendingTrainingCsv
         pendingTrainingCsv = null
         if (uri == null || csv == null) {
@@ -203,12 +209,11 @@ class MainActivity : ComponentActivity() {
                         stream.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
                     }
                     analysisHistoryExportMessage =
-                        "CSV guardado. El escenario, la partición y el nivel de referencia " +
-                                "están pendientes de completar."
+                        "Archivo guardado. Completa y verifica las referencias del laboratorio antes de evaluar."
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
-                    analysisHistoryError = "No se pudo escribir el CSV. Vuelve a exportar la sesión."
+                    analysisHistoryError = "No se pudo escribir el archivo. Vuelve a exportar la sesión."
                 } finally {
                     analysisHistoryExportingId = null
                 }
@@ -291,6 +296,8 @@ class MainActivity : ComponentActivity() {
                                     onShare = { entry -> shareAnalysisReport(entry) },
                                     exportingId = analysisHistoryExportingId, exportMessage = analysisHistoryExportMessage,
                                     onExport = { entry -> exportTrainingObservation(entry) },
+                                    onExportTemporal = { entry -> exportTrainingObservation(entry, temporal = true) },
+                                    onExportExperiment = { entry -> exportTrainingObservation(entry, experiment = true) },
                                     modifier = Modifier.weight(1f)
                                 )
                             } else {
@@ -724,7 +731,7 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun exportTrainingObservation(entry: AnalysisHistoryEntry) {
+    private fun exportTrainingObservation(entry: AnalysisHistoryEntry, temporal: Boolean = false, experiment: Boolean = false) {
         if (analysisHistoryExportingId != null || analysisHistoryDeletingId != null ||
             analysisHistoryLoading) return
         analysisHistoryExportingId = entry.id
@@ -732,8 +739,9 @@ class MainActivity : ComponentActivity() {
         analysisHistoryError = null
         lifecycleScope.launch {
             try {
-                pendingTrainingCsv = connectionRepository.getTrainingObservationCsv(entry.id)
-                trainingCsvDocument.launch("wifiprevent_observacion.csv")
+                pendingTrainingCsv = connectionRepository.getTrainingObservationCsv(entry.id, temporal, experiment)
+                if (experiment) experimentJsonDocument.launch("wifiprevent_registro.json")
+                else trainingCsvDocument.launch(if (temporal) "wifiprevent_eventos.csv" else "wifiprevent_observacion.csv")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

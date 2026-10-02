@@ -23,10 +23,14 @@ fun AnalysisHistoryScreen(
     onRiskFilterChange: (String?) -> Unit, onCaptureModeFilterChange: (String?) -> Unit,
     onDelete: (String) -> Unit, onShare: (AnalysisHistoryEntry) -> Unit,
     exportingId: String?, exportMessage: String?, onExport: (AnalysisHistoryEntry) -> Unit,
+    onExportTemporal: (AnalysisHistoryEntry) -> Unit = {},
+    onExportExperiment: (AnalysisHistoryEntry) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var pendingDelete by remember { mutableStateOf<AnalysisHistoryEntry?>(null) }
     var pendingExport by remember { mutableStateOf<AnalysisHistoryEntry?>(null) }
+    var experimentExport by remember { mutableStateOf(false) }
+    var temporalExport by remember { mutableStateOf(false) }
     var showFilters by rememberSaveable { mutableStateOf(false) }
     pendingDelete?.let { entry ->
         AlertDialog(onDismissRequest = { pendingDelete = null }, title = { Text("Eliminar análisis") },
@@ -37,8 +41,8 @@ fun AnalysisHistoryScreen(
     }
     pendingExport?.let { entry ->
         AlertDialog(onDismissRequest = { pendingExport = null }, title = { Text("Exportar métricas") },
-            text = { Text("CSV sin nombre de red ni identificadores. Las etiquetas de investigación quedan vacías. Elige una carpeta local para guardarlo en el teléfono.") },
-            confirmButton = { TextButton(onClick = { pendingExport = null; onExport(entry) }) { Text("Guardar archivo") } },
+            text = { Text("Metadatos sin nombre de red ni identificadores de instalación. Las predicciones no son referencias de investigación. Elige una carpeta local para guardar el archivo.") },
+            confirmButton = { TextButton(onClick = { pendingExport = null; if (experimentExport) onExportExperiment(entry) else if (temporalExport) onExportTemporal(entry) else onExport(entry) }) { Text("Guardar archivo") } },
             dismissButton = { TextButton(onClick = { pendingExport = null }) { Text("Cancelar") } })
     }
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp),
@@ -101,6 +105,7 @@ fun AnalysisHistoryScreen(
                             Text("Qué puedes hacer", style = MaterialTheme.typography.titleSmall)
                             entry.recommendations.forEach { Text("• $it") }
                         }
+                        EventDetails(entry.temporalCapture, entry.detectedEvents)
                         DetailRow("Seguridad", formatSecurityType(entry.securityType))
                         DetailRow("Muestra", formatSampleQuality(entry.sampleQuality))
                         DetailRow("Método", formatAssessmentVersion(entry.assessmentVersion))
@@ -137,13 +142,23 @@ fun AnalysisHistoryScreen(
                         if (entry.captureMode == "full") {
                             val eligible = entry.relayMetricsCollected && entry.metrics.durationSeconds >= 30 &&
                                 entry.metrics.receivedPackets + entry.metrics.transmittedPackets >= 100
-                            OutlinedButton(onClick = { pendingExport = entry },
+                            OutlinedButton(onClick = { experimentExport = false; temporalExport = false; pendingExport = entry },
                                 enabled = eligible && exportingId == null && deletingId == null && !loading,
                                 modifier = Modifier.fillMaxWidth()) {
                                 Text(if (exportingId == entry.id) "Preparando CSV…" else "Exportar métricas CSV")
                             }
                             if (!eligible) Text("Exportación: mínimo 30 s, 100 paquetes y categorías disponibles.",
                                 style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (entry.temporalCapture != null) {
+                            OutlinedButton(onClick = { experimentExport = true; pendingExport = entry },
+                                enabled = exportingId == null && deletingId == null && !loading,
+                                modifier = Modifier.fillMaxWidth()) { Text("Exportar registro experimental JSON") }
+
+                            OutlinedButton(onClick = { experimentExport = false; temporalExport = true; pendingExport = entry },
+                                enabled = !entry.temporalCapture.truncated && entry.temporalCapture.elapsedMs >= 30_000 &&
+                                    exportingId == null && deletingId == null && !loading,
+                                modifier = Modifier.fillMaxWidth()) { Text("Exportar observaciones temporales") }
                         }
                         TextButton(onClick = { pendingDelete = entry }, enabled = deletingId == null && exportingId == null && !loading,
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {

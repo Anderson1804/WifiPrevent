@@ -13,5 +13,7 @@ data class AnalysisReceipt(
     val sampleQuality: String,
     val recommendations: List<String>,
     val relayMetricsCollected: Boolean,
-    val relayMetrics: RelayCaptureMetrics
+    val relayMetrics: RelayCaptureMetrics,
+    val temporalCapture: TemporalCapture? = null,
+    val detectedEvents: List<DetectedEvent> = emptyList()
 )

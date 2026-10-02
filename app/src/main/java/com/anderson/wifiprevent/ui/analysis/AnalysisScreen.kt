@@ -73,6 +73,7 @@ fun AnalysisScreen(
                             Text("Las categorías del tráfico estarán en el historial al guardar.", style = MaterialTheme.typography.bodySmall)
                         }
                         receipt?.let { result ->
+                            EventDetails(result.temporalCapture, result.detectedEvents)
                             DetailRow("Método", formatAssessmentVersion(result.assessmentVersion))
                             DetailRow("Muestra", formatSampleQuality(result.sampleQuality))
                             result.riskReasons.forEach { Text("• $it") }
@@ -120,6 +121,11 @@ fun AnalysisScreen(
         if (state == AnalysisSessionState.ANALYZING) {
             Button(onClick = onStop, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Finalizar análisis") }
+        }
+        if (com.anderson.wifiprevent.BuildConfig.DEBUG) {
+            ExpandableSection("Laboratorio de pruebas") {
+                LaboratoryPanel(state == AnalysisSessionState.ANALYZING && session?.captureMode == CaptureMode.FULL)
+            }
         }
         if (uploading) LinearProgressIndicator(Modifier.fillMaxWidth())
         uploadMessage?.let { StatusNotice(it, error = uploadError) }

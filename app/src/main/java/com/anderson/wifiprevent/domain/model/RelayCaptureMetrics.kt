@@ -7,7 +7,8 @@ data class RelayCaptureMetrics(
     val httpObservations: Long,
     val tlsOrQuicObservations: Long,
     val otherObservations: Long,
-    val uniqueDestinations: Int
+    val uniqueDestinations: Int,
+    val temporalCapture: TemporalCapture? = null
 ) {
     companion object {
         val EMPTY = RelayCaptureMetrics(0, 0, 0, 0, 0, 0, 0)

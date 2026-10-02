@@ -1,5 +1,7 @@
 package com.anderson.wifiprevent.data.local
 
+import com.anderson.wifiprevent.domain.model.TemporalCapture
+import org.json.JSONObject
 import android.content.Context
 import android.net.TrafficStats
 import android.os.SystemClock
@@ -71,6 +73,7 @@ class AnalysisSessionStore(context: Context) {
             .remove("relay_tls_or_quic_observations")
             .remove("relay_other_observations")
             .remove("relay_unique_destinations")
+            .remove("temporal_capture")
             .putMetadata(TrafficMetadataSummary.EMPTY)
             .commit()
     }
@@ -129,6 +132,7 @@ class AnalysisSessionStore(context: Context) {
             .putLong("relay_tls_or_quic_observations", metrics.tlsOrQuicObservations)
             .putLong("relay_other_observations", metrics.otherObservations)
             .putInt("relay_unique_destinations", metrics.uniqueDestinations)
+            .putString("temporal_capture", metrics.temporalCapture?.toJson()?.toString())
             .commit()
     }
 
@@ -174,7 +178,10 @@ class AnalysisSessionStore(context: Context) {
                     "relay_tls_or_quic_observations", 0
                 ),
                 otherObservations = preferences.getLong("relay_other_observations", 0),
-                uniqueDestinations = preferences.getInt("relay_unique_destinations", 0)
+                uniqueDestinations = preferences.getInt("relay_unique_destinations", 0),
+                temporalCapture = preferences.getString("temporal_capture", null)?.let {
+                    TemporalCapture.fromJson(JSONObject(it))
+                }
             )
         )
     }
